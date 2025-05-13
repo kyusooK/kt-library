@@ -76,6 +76,7 @@ public class Subscription  {
 //<<< Clean Arch / Port Method
     public void cancelSubscription(CancelSubscriptionCommand cancelSubscriptionCommand){
         
+        // 구독 취소에 따른 구독 신청시 생성된 정보 제거
         repository().findById(this.getId()).ifPresent(subscription ->{
             this.setIsSubscription(false);
             this.setStartSubscription(null);
@@ -94,7 +95,7 @@ public class Subscription  {
         ObjectMapper mapper = new ObjectMapper();
         Map<Long, Object> subscriptionMap = mapper.convertValue(outOfPoint.getSubscriptionId(), Map.class);
 
-        // subscriptionId와 일치하는 Subscription정보를 조회 후, 구독 신청에 따라 생성된 정보를 다시 제거
+        // subscriptionId와 일치하는 Subscription정보를 조회 후, 구독 신청에 따라 생성된 정보 제거
         repository().findById(Long.valueOf(subscriptionMap.get("id").toString())).ifPresent(subscription->{
             
             subscription.setIsSubscription(false);
