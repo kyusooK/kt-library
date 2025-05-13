@@ -57,7 +57,7 @@ public class Manuscript {
     public void requestPublish(RequestPublishCommand requestPublishCommand) {
         // 원고 조회
         repository().findById(this.getId()).ifPresent(manuscript ->{
-            // 원고의 상태를 완료처리 후 이벤트 발행행
+            // 원고의 상태를 완료처리 후 이벤트 발행
             if(requestPublishCommand.getStatus() == status.DONE){
                 this.setStatus(requestPublishCommand.getStatus());
 

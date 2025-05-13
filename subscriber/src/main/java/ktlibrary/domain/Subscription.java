@@ -1,16 +1,17 @@
 package ktlibrary.domain;
 
-import ktlibrary.domain.SubscriptionApplied;
-import ktlibrary.domain.SubscriptionFailed;
-import ktlibrary.SubscriberApplication;
-import javax.persistence.*;
-import java.util.List;
-import lombok.Data;
 import java.util.Date;
-import java.time.LocalDate;
-import java.util.Map;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Collections;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.PostPersist;
+import javax.persistence.Table;
+
+import ktlibrary.SubscriberApplication;
+import lombok.Data;
 
 
 @Entity
@@ -22,28 +23,25 @@ public class Subscription  {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
-    
-    
-    
-private Long id;    
+    private Long id;    
     
     @Embedded
-private BookId bookId;    
+    private BookId bookId;    
     
     @Embedded
-private UserId userId;    
-    
-    
-private Boolean isSubscription;    
-    
-    
-private Date startSubscription;    
-    
-    
-private Date endSubscription;    
-    
-    
-private String webUrl;
+    private UserId userId;    
+        
+        
+    private Boolean isSubscription;    
+        
+        
+    private Date startSubscription;    
+        
+        
+    private Date endSubscription;    
+        
+        
+    private String webUrl;
 
     @PostPersist
     public void onPostPersist(){
@@ -71,13 +69,7 @@ private String webUrl;
     public void cancelSubscription(CancelSubscriptionCommand cancelSubscriptionCommand){
         
         //implement business logic here:
-        
-
-        ktlibrary.external.SubscriptionQuery subscriptionQuery = new ktlibrary.external.SubscriptionQuery();
-        // subscriptionQuery.set??()        
-          = SubscriptionApplication.applicationContext
-            .getBean(ktlibrary.external.Service.class)
-            .subscription(subscriptionQuery);
+ 
 
         SubscriptionCanceled subscriptionCanceled = new SubscriptionCanceled(this);
         subscriptionCanceled.publishAfterCommit();
