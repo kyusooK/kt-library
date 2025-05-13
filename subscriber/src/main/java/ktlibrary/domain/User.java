@@ -57,11 +57,11 @@ public class User {
     //<<< Clean Arch / Port Method
     public static void guideFeeConversionSuggestion(SubscriptionFailed subscriptionFailed) {
  
-        // 발행된 이벤트에서 userId정보를 추출출
+        // 발행된 이벤트에서 userId정보를 추출
         ObjectMapper mapper = new ObjectMapper();
         Map<Long, Object> subscriptionMap = mapper.convertValue(subscriptionFailed.getUserId(), Map.class);
 
-        // 추출한 userId와 동일한 User 정보를 조회 후, 안내 메시지 저장장
+        // 추출한 userId와 동일한 User 정보를 조회 후, 안내 메시지 저장
         repository().findById(Long.valueOf(subscriptionMap.get("id").toString())).ifPresent(user->{
             
             user.setMessage("포인트가 부족하여 구독 신청에 실패했습니다. 포인트를 충전하세요. 또는 구독권을 결제하여 무제한으로 원하는 도서를 구독하세요!");

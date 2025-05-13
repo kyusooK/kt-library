@@ -24,9 +24,6 @@ public class Author  {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
-        
-        
-        
     private Long id;    
         
         
@@ -43,7 +40,6 @@ public class Author  {
     
     @Enumerated(EnumType.STRING)
     private List<Portfolio> portfolios;    
-        
         
     private Boolean isApprove;
 
