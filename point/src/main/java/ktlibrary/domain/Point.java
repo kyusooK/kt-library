@@ -73,7 +73,7 @@ public class Point {
 
         RestTemplate restTemplate = new RestTemplate();
         
-        // 도서Id, 구독자Id를 조회하여 정보 추출출
+        // 도서Id, 구독자Id를 조회하여 정보 추출
         String bookServiceUrl = "http://localhost:8087/books/" + bookId;
         String userServiceUrl = "http://localhost:8086/users/" + userId;
 
@@ -89,7 +89,7 @@ public class Point {
                 // 베스트셀러 여부에 따라 차감할 포인트의 양을 분류류
                 Object isBestSeller = bookResponse.getBody().get("isBestSeller");
                 if(isBestSeller != null && (Boolean)isBestSeller == true){
-                    // 베스트셀러인 경우 1500포인트 필요
+                    // 베스트셀러인 경우 구독 신청에 필요한 포인트를 1500포인트로 설정 후 조건문에 따라 감소, 부족 이벤트 발행
                     if(point.getPoint() >= 1500){
                         point.setPoint(point.getPoint() - 1500);
                         repository().save(point);
@@ -103,7 +103,7 @@ public class Point {
                         outOfPoint.publishAfterCommit();
                     }
                 }else{
-                    // 일반 책인 경우 1000포인트 필요
+                    // 일반 도서인 경우 구독 신청에 필요한 포인트를 1000포인트로 설정 조건문에 따라 감소, 부족 이벤트 발행
                     if(point.getPoint() >= 1000){
                         point.setPoint(point.getPoint() - 1000);
                         repository().save(point);
