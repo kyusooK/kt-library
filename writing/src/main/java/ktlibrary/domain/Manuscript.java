@@ -1,15 +1,17 @@
 package ktlibrary.domain;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDate;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import javax.persistence.*;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.PostPersist;
+import javax.persistence.PreUpdate;
+import javax.persistence.Table;
+
 import ktlibrary.WritingApplication;
-import ktlibrary.domain.ManuscriptEdited;
-import ktlibrary.domain.ManuscriptRegistered;
 import lombok.Data;
 
 @Entity
@@ -34,9 +36,7 @@ public class Manuscript {
 
     @PostPersist
     public void onPostPersist() {
-        ManuscriptRegistered manuscriptRegistered = new ManuscriptRegistered(
-            this
-        );
+        ManuscriptRegistered manuscriptRegistered = new ManuscriptRegistered(this);
         manuscriptRegistered.publishAfterCommit();
     }
 
@@ -55,10 +55,17 @@ public class Manuscript {
 
     //<<< Clean Arch / Port Method
     public void requestPublish(RequestPublishCommand requestPublishCommand) {
-        //implement business logic here:
+        // 원고 조회
+        repository().findById(this.getId()).ifPresent(manuscript ->{
+            // 원고의 상태를 완료처리 후 이벤트 발행행
+            if(requestPublishCommand.getStatus() == status.DONE){
+                this.setStatus(requestPublishCommand.getStatus());
 
-        PublishingRequested publishingRequested = new PublishingRequested(this);
-        publishingRequested.publishAfterCommit();
+                PublishingRequested publishingRequested = new PublishingRequested(this);
+                publishingRequested.publishAfterCommit();
+            }
+        });
+
     }
     //>>> Clean Arch / Port Method
 
