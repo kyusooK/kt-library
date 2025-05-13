@@ -49,12 +49,6 @@ public class Subscription  {
 
         SubscriptionApplied subscriptionApplied = new SubscriptionApplied(this);
         subscriptionApplied.publishAfterCommit();
-
-
-
-        SubscriptionFailed subscriptionFailed = new SubscriptionFailed(this);
-        subscriptionFailed.publishAfterCommit();
-
     
     }
 
