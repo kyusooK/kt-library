@@ -34,17 +34,45 @@ public class Publishing {
 
     private Long authorId;
 
-    @PostPersist
-    public void onPostPersist() {
-        Published published = new Published(this);
-        published.publishAfterCommit();
-    }
-
     public static PublishingRepository repository() {
         PublishingRepository publishingRepository = AiApplication.applicationContext.getBean(
             PublishingRepository.class
         );
         return publishingRepository;
     }
+
+    //<<< Clean Arch / Port Method
+    public static void publish(PublishingRequested publishingRequested) {
+        //implement business logic here:
+
+        /** Example 1:  new item 
+        Publishing publishing = new Publishing();
+        repository().save(publishing);
+
+        Published published = new Published(publishing);
+        published.publishAfterCommit();
+        */
+
+        /** Example 2:  finding and process
+        
+        // if publishingRequested.authorId exists, use it
+        
+        // ObjectMapper mapper = new ObjectMapper();
+        // Map<Long, Object> manuscriptMap = mapper.convertValue(publishingRequested.getAuthorId(), Map.class);
+
+        repository().findById(publishingRequested.get???()).ifPresent(publishing->{
+            
+            publishing // do something
+            repository().save(publishing);
+
+            Published published = new Published(publishing);
+            published.publishAfterCommit();
+
+         });
+        */
+
+    }
+    //>>> Clean Arch / Port Method
+
 }
 //>>> DDD / Aggregate Root

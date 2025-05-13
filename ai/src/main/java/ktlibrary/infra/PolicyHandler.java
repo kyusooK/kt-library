@@ -22,5 +22,21 @@ public class PolicyHandler {
 
     @StreamListener(KafkaProcessor.INPUT)
     public void whatever(@Payload String eventString) {}
+
+    @StreamListener(
+        value = KafkaProcessor.INPUT,
+        condition = "headers['type']=='PublishingRequested'"
+    )
+    public void wheneverPublishingRequested_Publish(
+        @Payload PublishingRequested publishingRequested
+    ) {
+        PublishingRequested event = publishingRequested;
+        System.out.println(
+            "\n\n##### listener Publish : " + publishingRequested + "\n\n"
+        );
+
+        // Sample Logic //
+        Publishing.publish(event);
+    }
 }
 //>>> Clean Arch / Inbound Adaptor
