@@ -21,37 +21,33 @@ public class Author  {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
-    
-    
-    
-private Long id;    
-    
-    
-private String email;    
-    
-    
-private String authorName;    
-    
-    
-private String introduction;    
-    
-    
-private String feturedWorks;    
+        
+        
+        
+    private Long id;    
+        
+        
+    private String email;    
+        
+        
+    private String authorName;    
+        
+        
+    private String introduction;    
+        
+        
+    private String feturedWorks;    
     
     @Enumerated(EnumType.STRING)
-private List<Portfolio> portfolios;    
-    
-    
-private Boolean isApprove;
+    private List<Portfolio> portfolios;    
+        
+        
+    private Boolean isApprove;
 
     @PostPersist
     public void onPostPersist(){
-
-
         AuthorRegistered authorRegistered = new AuthorRegistered(this);
         authorRegistered.publishAfterCommit();
-
-    
     }
 
     public static AuthorRepository repository(){
@@ -59,33 +55,26 @@ private Boolean isApprove;
         return authorRepository;
     }
 
-
-
 //<<< Clean Arch / Port Method
     public void approveAuthor(ApproveAuthorCommand approveAuthorCommand){
         
-        //implement business logic here:
-        
-
-
-        AuthorApproved authorApproved = new AuthorApproved(this);
-        authorApproved.publishAfterCommit();
+        repository().findById(this.getId()).ifPresent(author->{
+            if(approveAuthorCommand.getIsApprove() == true){
+                AuthorApproved authorApproved = new AuthorApproved(this);
+                authorApproved.publishAfterCommit();
+            }
+        });
     }
 //>>> Clean Arch / Port Method
 //<<< Clean Arch / Port Method
     public void disapproveAuthor(DisapproveAuthorCommand disapproveAuthorCommand){
         
-        //implement business logic here:
-        
-
-        ktlibrary.external.AuthorQuery authorQuery = new ktlibrary.external.AuthorQuery();
-        // authorQuery.set??()        
-          = AuthorApplication.applicationContext
-            .getBean(ktlibrary.external.Service.class)
-            .author(authorQuery);
-
-        AuthorDisApproved authorDisApproved = new AuthorDisApproved(this);
-        authorDisApproved.publishAfterCommit();
+        repository().findById(this.getId()).ifPresent(author->{
+            if(disapproveAuthorCommand.getIsApprove() == false){
+                AuthorDisApproved authorDisApproved = new AuthorDisApproved(this);
+                authorDisApproved.publishAfterCommit();
+            }
+        });
     }
 //>>> Clean Arch / Port Method
 
