@@ -90,9 +90,11 @@ public class Subscription  {
 //<<< Clean Arch / Port Method
     public static void failSubscription(OutOfPoint outOfPoint){
         
+        // 발행된 포인트부족 이벤트에서 subscriptionId 정보를 추출
         ObjectMapper mapper = new ObjectMapper();
         Map<Long, Object> subscriptionMap = mapper.convertValue(outOfPoint.getSubscriptionId(), Map.class);
 
+        // subscriptionId와 일치하는 Subscription정보를 조회 후, 구독 신청에 따라 생성된 정보를 다시 제거
         repository().findById(Long.valueOf(subscriptionMap.get("id").toString())).ifPresent(subscription->{
             
             subscription.setIsSubscription(false);
