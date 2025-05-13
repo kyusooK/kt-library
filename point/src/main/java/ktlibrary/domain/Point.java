@@ -86,7 +86,7 @@ public class Point {
             Object isPurchase = userResponse.getBody().get("isPurchase");
             if(isPurchase != null && (Boolean)isPurchase == true){
             }else{
-                // 베스트셀러 여부에 따라 차감할 포인트의 양을 분류류
+                // 베스트셀러 여부에 따라 차감할 포인트를 설정
                 Object isBestSeller = bookResponse.getBody().get("isBestSeller");
                 if(isBestSeller != null && (Boolean)isBestSeller == true){
                     // 베스트셀러인 경우 구독 신청에 필요한 포인트를 1500포인트로 설정 후 조건문에 따라 감소, 부족 이벤트 발행
