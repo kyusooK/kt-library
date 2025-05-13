@@ -27,6 +27,8 @@ public class User {
 
     private Boolean isPurchase;
 
+    private String message;
+
     @PostPersist
     public void onPostPersist() {
         UserRegistered userRegistered = new UserRegistered(this);
@@ -51,33 +53,17 @@ public class User {
     //>>> Clean Arch / Port Method
 
     //<<< Clean Arch / Port Method
-    public static void guideFeeConversionSuggestion(
-        SubscriptionFailed subscriptionFailed
-    ) {
-        //implement business logic here:
-
-        /** Example 1:  new item 
-        User user = new User();
-        repository().save(user);
-
-        */
-
-        /** Example 2:  finding and process
+    public static void guideFeeConversionSuggestion(SubscriptionFailed subscriptionFailed) {
+ 
         
-        // if subscriptionFailed.bookIduserId exists, use it
-        
-        // ObjectMapper mapper = new ObjectMapper();
-        // Map<Long, Object> subscriptionMap = mapper.convertValue(subscriptionFailed.getBookId(), Map.class);
-        // Map<Long, Object> subscriptionMap = mapper.convertValue(subscriptionFailed.getUserId(), Map.class);
+        ObjectMapper mapper = new ObjectMapper();
+        Map<Long, Object> subscriptionMap = mapper.convertValue(subscriptionFailed.getUserId(), Map.class);
 
-        repository().findById(subscriptionFailed.get???()).ifPresent(user->{
+        repository().findById(Long.valueOf(subscriptionMap.get("id").toString())).ifPresent(user->{
             
-            user // do something
+            user.setMessage("포인트가 부족하여 구독 신청에 실패했습니다. 포인트를 충전하세요. 또는 구독권을 결제하여 무제한으로 원하는 도서를 구독하세요!");
             repository().save(user);
-
-
          });
-        */
 
     }
     //>>> Clean Arch / Port Method

@@ -35,6 +35,9 @@ public class Point {
     @Embedded
     private UserId userId;
 
+    @Embedded
+    private SubscriptionId subscriptionId;
+
     public static PointRepository repository() {
         PointRepository pointRepository = PointApplication.applicationContext.getBean(
             PointRepository.class
@@ -94,6 +97,8 @@ public class Point {
                         pointDecreased.publishAfterCommit();
                     }else{
                         // 포인트가 부족하면 포인트 부족 이벤트를 발행.
+                        point.setSubscriptionId(new SubscriptionId(subscriptionApplied.getId()));
+                        repository().save(point);
                         OutOfPoint outOfPoint = new OutOfPoint(point);
                         outOfPoint.publishAfterCommit();
                     }
@@ -105,6 +110,8 @@ public class Point {
                         PointDecreased pointDecreased = new PointDecreased(point);
                         pointDecreased.publishAfterCommit();
                     }else{
+                        point.setSubscriptionId(new SubscriptionId(subscriptionApplied.getId()));
+                        repository().save(point);
                         OutOfPoint outOfPoint = new OutOfPoint(point);
                         outOfPoint.publishAfterCommit();
                     }

@@ -13,6 +13,10 @@ public class SubscriptionFailed extends AbstractEvent {
 
     private Long id;
     private Boolean isSubscription;
+    private BookId bookId;
+    private UserId userId;
+    private Date startSubscription;
+    private Date endSubscription;
 
     public SubscriptionFailed(Subscription aggregate) {
         super(aggregate);
