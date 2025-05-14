@@ -52,6 +52,8 @@ public class Publishing {
         Publishing publishing = new Publishing();
         publishing.setBookName(publishingRequested.getTitle());
 
+        String pdfUrl = "";
+        
         // 1. publishingRequested.getContent() 값을 pdf로 변환
         // 2. pdf를 web url(임시 변수에 저장)로 변환.
         // 3. web url을 토대로 표지 이미지 생성 후, url로 변환한 값을 image에 저장
