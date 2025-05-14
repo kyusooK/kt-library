@@ -7,6 +7,7 @@ import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.Lob;
 import javax.persistence.PostPersist;
 import javax.persistence.PreUpdate;
 import javax.persistence.Table;
@@ -26,6 +27,7 @@ public class Manuscript {
 
     private String title;
 
+    @Lob
     private String content;
 
     @Embedded

@@ -77,8 +77,14 @@ public class Book {
         repository().findById(Long.valueOf(bookMap.get("id").toString())).ifPresent(book->{
             
             // 특정 도서의 구독 신청이 진행될 때마다 구독숫자가 증가
-            book.setSubscriptionCount(book.getSubscriptionCount() + 1);
-            repository().save(book);
+            if(book.getSubscriptionCount() == null){
+                book.setSubscriptionCount(1);
+                repository().save(book);
+            }else{
+                book.setSubscriptionCount(book.getSubscriptionCount() + 1);
+                repository().save(book);
+            }
+
 
             // 구독 숫자가 일정 횟수에 도달하면 베스트셀러처리
             if(book.getSubscriptionCount() == 3){
