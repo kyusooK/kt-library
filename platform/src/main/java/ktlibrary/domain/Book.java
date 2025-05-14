@@ -1,15 +1,16 @@
 package ktlibrary.domain;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDate;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
 import java.util.Map;
-import javax.persistence.*;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ktlibrary.PlatformApplication;
-import ktlibrary.domain.BadgeGranted;
-import ktlibrary.domain.BookRegistered;
 import lombok.Data;
 
 @Entity
@@ -45,69 +46,48 @@ public class Book {
 
     //<<< Clean Arch / Port Method
     public static void registerBook(Published published) {
-        //implement business logic here:
 
-        /** Example 1:  new item 
+
+        // 출간 준비됨 이벤트 발행에 따른 도서 정보 등록
         Book book = new Book();
+        book.setBookName(published.getBookName());
+        book.setAuthorName(published.getAuthorId());
+        book.setPdfPath(published.getPdfPath());
+        book.setWebUrl(published.getWebUrl());
+        book.setCategory(published.getCategory());
+        book.setIsBestSeller(false);
+        book.setSubscriptionCount(0);
+        
         repository().save(book);
 
         BookRegistered bookRegistered = new BookRegistered(book);
         bookRegistered.publishAfterCommit();
-        */
 
-        /** Example 2:  finding and process
-        
-        // if published.manuscriptIdmanuscriptIdllmId exists, use it
-        
-        // ObjectMapper mapper = new ObjectMapper();
-        // Map<Long, Object> publishingMap = mapper.convertValue(published.getManuscriptId(), Map.class);
-        // Map<Long, Object> publishingMap = mapper.convertValue(published.getManuscriptId(), Map.class);
-        // Map<, Object> publishingMap = mapper.convertValue(published.getLlmId(), Map.class);
-
-        repository().findById(published.get???()).ifPresent(book->{
-            
-            book // do something
-            repository().save(book);
-
-            BookRegistered bookRegistered = new BookRegistered(book);
-            bookRegistered.publishAfterCommit();
-
-         });
-        */
 
     }
 
     //>>> Clean Arch / Port Method
     //<<< Clean Arch / Port Method
     public static void grantBadge(SubscriptionApplied subscriptionApplied) {
-        //implement business logic here:
-
-        /** Example 1:  new item 
-        Book book = new Book();
-        repository().save(book);
-
-        BadgeGranted badgeGranted = new BadgeGranted(book);
-        badgeGranted.publishAfterCommit();
-        */
-
-        /** Example 2:  finding and process
         
-        // if subscriptionApplied.bookIduserId exists, use it
-        
-        // ObjectMapper mapper = new ObjectMapper();
-        // Map<Long, Object> subscriptionMap = mapper.convertValue(subscriptionApplied.getBookId(), Map.class);
-        // Map<Long, Object> subscriptionMap = mapper.convertValue(subscriptionApplied.getUserId(), Map.class);
+        ObjectMapper mapper = new ObjectMapper();
+        Map<Long, Object> bookMap = mapper.convertValue(subscriptionApplied.getBookId(), Map.class);
 
-        repository().findById(subscriptionApplied.get???()).ifPresent(book->{
+        // 구독시 선택한 도서ID와 일치하는 도서정보를 조회
+        repository().findById(Long.valueOf(bookMap.get("id").toString())).ifPresent(book->{
             
-            book // do something
+            // 특정 도서의 구독 신청이 진행될 때마다 구독숫자가 증가
+            book.setSubscriptionCount(book.getSubscriptionCount() + 1);
             repository().save(book);
 
-            BadgeGranted badgeGranted = new BadgeGranted(book);
-            badgeGranted.publishAfterCommit();
+            // 구독 숫자가 일정 횟수에 도달하면 베스트셀러처리
+            if(book.getSubscriptionCount() == 3){
+                book.setIsBestSeller(true);
 
+                BadgeGranted badgeGranted = new BadgeGranted(book);
+                badgeGranted.publishAfterCommit();
+            }
          });
-        */
 
     }
     //>>> Clean Arch / Port Method

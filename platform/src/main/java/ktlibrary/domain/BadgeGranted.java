@@ -13,6 +13,7 @@ public class BadgeGranted extends AbstractEvent {
 
     private Long id;
     private String bookName;
+    private Integer subscriptionCount;
     private Boolean isBestSeller;
 
     public BadgeGranted(Book aggregate) {

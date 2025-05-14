@@ -1,10 +1,8 @@
 package ktlibrary.domain;
 
-import java.time.LocalDate;
-import java.util.*;
-import ktlibrary.domain.*;
 import ktlibrary.infra.AbstractEvent;
-import lombok.*;
+import lombok.Data;
+import lombok.ToString;
 
 //<<< DDD / Domain Event
 @Data
@@ -12,13 +10,13 @@ import lombok.*;
 public class Published extends AbstractEvent {
 
     private Long id;
-    private String manuscript;
     private String image;
     private String summaryContent;
     private String bookName;
-    private ManuscriptId manuscriptId;
-    private String bookPdf;
-    private Long authorId;
+    private String pdfPath;
+    private String webUrl;
+    private String authorId;
+    private String category;
 
     public Published(Publishing aggregate) {
         super(aggregate);
