@@ -2,6 +2,7 @@ package ktlibrary.domain;
 
 import java.util.List;
 
+import javax.persistence.ElementCollection;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
@@ -38,7 +39,7 @@ public class Author  {
         
     private String feturedWorks;    
     
-    @Enumerated(EnumType.STRING)
+    @ElementCollection
     private List<Portfolio> portfolios;    
         
     private Boolean isApprove;
