@@ -63,21 +63,28 @@ public class Publishing {
         String webUrl = aiService.convertToPdfAndGenerateWebUrl(content);
         publishing.setWebUrl(webUrl);
         
-        // 2. 표지 이미지 생성을 위한 프롬프트 생성 및 이미지 URL 저장
+        // 2. 표지 이미지 생성을 위한 프롬프트 생성
         String coverImagePrompt = aiService.generateCoverImagePrompt(content);
-        // 실제로는 이 프롬프트를 이미지 생성 API에 전송하여 URL을 받아야 함
-        // 여기서는 시뮬레이션으로 프롬프트를 이미지 URL로 사용
-        publishing.setImage("https://kt-library.com/images/" + System.currentTimeMillis());
         
-        // 3. 장르 분류 및 저장
+        // 3. DALL-E API를 사용하여 실제 이미지 생성 및 URL 저장
+        try {
+            String imageUrl = aiService.generateImage(coverImagePrompt);
+            publishing.setImage(imageUrl);
+        } catch (Exception e) {
+            // API 호출 실패 시 기본 이미지 사용
+            publishing.setImage("https://kt-library.com/images/default-cover.jpg");
+            System.err.println("이미지 생성 API 호출 실패: " + e.getMessage());
+        }
+        
+        // 4. 장르 분류 및 저장
         String category = aiService.categorizeContent(content);
         publishing.setCategory(category);
         
-        // 4. 줄거리 요약 및 저장
+        // 5. 줄거리 요약 및 저장
         String summary = aiService.summarizeContent(content);
         publishing.setSummaryContent(summary);
         
-        // 5. PDF 경로 생성 및 저장
+        // 6. PDF 경로 생성 및 저장
         String pdfPath = aiService.generatePdfPath(content, publishing.getImage(), summary);
         publishing.setPdfPath(pdfPath);
 

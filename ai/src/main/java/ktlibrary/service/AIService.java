@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.ArrayList;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -22,6 +23,9 @@ public class AIService {
 
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
     private String apiUrl;
+    
+    @Value("${openai.api.image-url:https://api.openai.com/v1/images/generations}")
+    private String imageApiUrl;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -49,6 +53,34 @@ public class AIService {
             return (String) message.get("content");
         } catch (Exception e) {
             throw new RuntimeException("AI 응답 처리 중 오류 발생", e);
+        }
+    }
+    
+    /**
+     * DALL-E API를 사용하여 이미지를 생성하고 URL을 반환합니다.
+     * @param prompt 이미지 생성을 위한 프롬프트
+     * @return 생성된 이미지의 URL
+     */
+    public String generateImage(String prompt) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+        
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("prompt", prompt);
+        requestBody.put("n", 1);
+        requestBody.put("size", "1024x1024");
+        requestBody.put("model", "dall-e-3");
+        
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(imageApiUrl, entity, String.class);
+            Map<String, Object> responseMap = objectMapper.readValue(response.getBody(), Map.class);
+            List<Map<String, Object>> data = (List<Map<String, Object>>) responseMap.get("data");
+            return (String) data.get(0).get("url");
+        } catch (Exception e) {
+            throw new RuntimeException("OpenAI 이미지 API 호출 중 오류 발생", e);
         }
     }
 
@@ -131,7 +163,11 @@ public class AIService {
         userMessage.put("role", "user");
         userMessage.put("content", prompt);
         
-        requestBody.put("messages", List.of(systemMessage, userMessage));
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(systemMessage);
+        messages.add(userMessage);
+        
+        requestBody.put("messages", messages);
         return requestBody;
     }
 
