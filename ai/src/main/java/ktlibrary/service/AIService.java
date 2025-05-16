@@ -23,11 +23,13 @@ import java.nio.file.Paths;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.annotation.PostConstruct;
+
 @Service
 @Slf4j
 public class AIService {
 
-    @Value("${openai.api.key}")
+    @Value("${openai.api.key:}")
     private String apiKey;
 
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
@@ -48,13 +50,21 @@ public class AIService {
     public AIService(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
-        
-        // 스토리지 디렉토리 생성
+    }
+    
+    @PostConstruct
+    public void init() {
+        // 초기화 메서드를 PostConstruct로 분리하여 모든 프로퍼티가 주입된 후 실행되도록 함
         initializeStorage();
     }
     
     private void initializeStorage() {
         try {
+            if (storagePath == null || storagePath.trim().isEmpty()) {
+                storagePath = "./storage"; // 기본값 설정
+                System.out.println("[AIService] 스토리지 경로가 설정되지 않아 기본값으로 설정: " + storagePath);
+            }
+            
             // 루트 스토리지 디렉토리 생성
             Path rootDir = Paths.get(storagePath);
             if (!Files.exists(rootDir)) {
@@ -82,7 +92,7 @@ public class AIService {
             System.out.println("[AIService] 스토리지 디렉토리 쓰기 권한: " + Files.isWritable(rootDir));
             System.out.println("[AIService] 웹 디렉토리 존재 여부: " + Files.exists(webDir));
             System.out.println("[AIService] 웹 디렉토리 쓰기 권한: " + Files.isWritable(webDir));
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.err.println("[AIService] 스토리지 디렉토리 생성 실패: " + e.getMessage());
             e.printStackTrace();
         }
@@ -245,6 +255,12 @@ public class AIService {
         System.out.println("[AIService] PDF 변환 및 웹 URL 생성 시작");
         
         try {
+            // 경로 확인 및 재설정
+            if (storagePath == null || storagePath.trim().isEmpty()) {
+                storagePath = "./storage";
+                System.out.println("[AIService] 스토리지 경로가 설정되지 않아 기본값으로 설정: " + storagePath);
+            }
+            
             // 고유 ID 생성
             String uniqueId = String.valueOf(System.currentTimeMillis());
             
@@ -308,6 +324,12 @@ public class AIService {
         System.out.println("[AIService] PDF 경로 생성 시작");
         
         try {
+            // 경로 확인 및 재설정
+            if (storagePath == null || storagePath.trim().isEmpty()) {
+                storagePath = "./storage";
+                System.out.println("[AIService] 스토리지 경로가 설정되지 않아 기본값으로 설정: " + storagePath);
+            }
+            
             // 고유 ID 생성
             String uniqueId = String.valueOf(System.currentTimeMillis());
             

@@ -15,9 +15,9 @@ openai:
 # 애플리케이션 설정
 app:
   storage:
-    path: ${APP_STORAGE_PATH:./storage}
+    path: ./storage
   base:
-    url: ${APP_BASE_URL:http://localhost:8084}
+    url: http://localhost:8084
 
 ---
 
