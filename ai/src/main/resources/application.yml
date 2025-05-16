@@ -12,6 +12,13 @@ openai:
     url: https://api.openai.com/v1/chat/completions
     image-url: https://api.openai.com/v1/images/generations
 
+# 애플리케이션 설정
+app:
+  storage:
+    path: ${APP_STORAGE_PATH:./storage}
+  base:
+    url: ${APP_BASE_URL:http://localhost:8084}
+
 ---
 
 spring:

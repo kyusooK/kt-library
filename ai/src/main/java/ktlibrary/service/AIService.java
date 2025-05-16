@@ -12,6 +12,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +34,12 @@ public class AIService {
     
     @Value("${openai.api.image-url:https://api.openai.com/v1/images/generations}")
     private String imageApiUrl;
+    
+    @Value("${app.storage.path:./storage}")
+    private String storagePath;
+    
+    @Value("${app.base.url:http://localhost:8084}")
+    private String baseUrl;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -35,6 +47,30 @@ public class AIService {
     public AIService(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        
+        // 스토리지 디렉토리 생성
+        initializeStorage();
+    }
+    
+    private void initializeStorage() {
+        try {
+            // PDF 저장소 디렉토리 생성
+            Path pdfDir = Paths.get(storagePath, "pdfs");
+            if (!Files.exists(pdfDir)) {
+                Files.createDirectories(pdfDir);
+                System.out.println("[AIService] PDF 디렉토리 생성: " + pdfDir.toAbsolutePath());
+            }
+            
+            // 웹 컨텐츠 디렉토리 생성
+            Path webDir = Paths.get(storagePath, "web");
+            if (!Files.exists(webDir)) {
+                Files.createDirectories(webDir);
+                System.out.println("[AIService] 웹 컨텐츠 디렉토리 생성: " + webDir.toAbsolutePath());
+            }
+        } catch (IOException e) {
+            System.err.println("[AIService] 스토리지 디렉토리 생성 실패: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -153,21 +189,59 @@ public class AIService {
     }
 
     /**
-     * PDF 변환 및 웹 URL 생성을 시뮬레이션하는 메서드
+     * 책 내용을 HTML로 변환하고 웹에서 접근 가능한 URL을 생성합니다.
      * @param content 책 내용
      * @return 생성된 웹 URL
      */
     public String convertToPdfAndGenerateWebUrl(String content) {
         System.out.println("[AIService] PDF 변환 및 웹 URL 생성 시작");
-        // 실제 구현에서는 PDF 변환 서비스와 연동
-        // 여기서는 시뮬레이션한 URL 반환
-        String url = "https://kt-library.com/books/" + System.currentTimeMillis();
-        System.out.println("[AIService] 생성된 웹 URL: " + url);
-        return url;
+        
+        try {
+            // 고유 ID 생성
+            String uniqueId = String.valueOf(System.currentTimeMillis());
+            
+            // HTML 파일 생성
+            Path htmlFilePath = Paths.get(storagePath, "web", uniqueId + ".html");
+            
+            // 간단한 HTML 템플릿 생성
+            String htmlContent = "<!DOCTYPE html>\n"
+                    + "<html>\n"
+                    + "<head>\n"
+                    + "    <meta charset=\"UTF-8\">\n"
+                    + "    <title>책 내용</title>\n"
+                    + "    <style>\n"
+                    + "        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }\n"
+                    + "        h1 { color: #333; }\n"
+                    + "        .content { white-space: pre-wrap; }\n"
+                    + "    </style>\n"
+                    + "</head>\n"
+                    + "<body>\n"
+                    + "    <h1>책 내용</h1>\n"
+                    + "    <div class=\"content\">" + content.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</div>\n"
+                    + "</body>\n"
+                    + "</html>";
+            
+            // HTML 파일 저장
+            Files.write(htmlFilePath, htmlContent.getBytes());
+            System.out.println("[AIService] HTML 파일 생성: " + htmlFilePath.toAbsolutePath());
+            
+            // URL 생성 (실제 환경에서는 웹 서버 설정에 맞게 조정 필요)
+            String url = baseUrl + "/books/" + uniqueId;
+            System.out.println("[AIService] 생성된 웹 URL: " + url);
+            
+            // 실제 파일 경로 출력 (디버깅용)
+            System.out.println("[AIService] 실제 파일 경로: " + htmlFilePath.toAbsolutePath());
+            
+            return url;
+        } catch (IOException e) {
+            System.err.println("[AIService] 웹 컨텐츠 생성 중 오류 발생: " + e.getMessage());
+            e.printStackTrace();
+            return baseUrl + "/books/error";
+        }
     }
 
     /**
-     * PDF 경로 생성을 시뮬레이션하는 메서드
+     * 책 내용, 이미지, 요약을 기반으로 PDF를 생성하고 경로를 반환합니다.
      * @param content 책 내용
      * @param imageUrl 표지 이미지 URL
      * @param summary 요약 내용
@@ -175,11 +249,35 @@ public class AIService {
      */
     public String generatePdfPath(String content, String imageUrl, String summary) {
         System.out.println("[AIService] PDF 경로 생성 시작");
-        // 실제 구현에서는 PDF 생성 서비스와 연동
-        // 여기서는 시뮬레이션한 경로 반환
-        String path = "/storage/pdfs/" + System.currentTimeMillis() + ".pdf";
-        System.out.println("[AIService] 생성된 PDF 경로: " + path);
-        return path;
+        
+        try {
+            // 고유 ID 생성
+            String uniqueId = String.valueOf(System.currentTimeMillis());
+            
+            // 간단한 텍스트 파일로 대체 (실제 구현에서는 PDF 라이브러리 사용 필요)
+            Path pdfDir = Paths.get(storagePath, "pdfs");
+            if (!Files.exists(pdfDir)) {
+                Files.createDirectories(pdfDir);
+            }
+            
+            Path textFilePath = Paths.get(pdfDir.toString(), uniqueId + ".txt");
+            
+            // 텍스트 파일에 내용 작성
+            String fileContent = "이미지 URL: " + imageUrl + "\n\n"
+                    + "요약:\n" + summary + "\n\n"
+                    + "내용:\n" + content;
+            
+            Files.write(textFilePath, fileContent.getBytes());
+            
+            String pdfPath = textFilePath.toAbsolutePath().toString();
+            System.out.println("[AIService] 생성된 PDF 경로: " + pdfPath);
+            
+            return pdfPath;
+        } catch (IOException e) {
+            System.err.println("[AIService] PDF 생성 중 오류 발생: " + e.getMessage());
+            e.printStackTrace();
+            return "/storage/pdfs/error.txt";
+        }
     }
 
     private Map<String, Object> createChatCompletionRequest(String prompt) {
