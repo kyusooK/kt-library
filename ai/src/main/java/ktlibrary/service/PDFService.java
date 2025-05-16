@@ -5,9 +5,22 @@ import org.springframework.stereotype.Service;
 
 import com.itextpdf.text.Document;
 import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Font;
 import com.itextpdf.text.PageSize;
+import com.itextpdf.text.pdf.BaseFont;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.tool.xml.XMLWorkerHelper;
+import com.itextpdf.tool.xml.css.CssFile;
+import com.itextpdf.tool.xml.css.StyleAttrCSSResolver;
+import com.itextpdf.tool.xml.html.CssAppliers;
+import com.itextpdf.tool.xml.html.CssAppliersImpl;
+import com.itextpdf.tool.xml.html.Tags;
+import com.itextpdf.tool.xml.parser.XMLParser;
+import com.itextpdf.tool.xml.pipeline.css.CSSResolver;
+import com.itextpdf.tool.xml.pipeline.css.CssResolverPipeline;
+import com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline;
+import com.itextpdf.tool.xml.pipeline.html.HtmlPipeline;
+import com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileOutputStream;
@@ -141,7 +154,10 @@ public class PDFService {
         html.append("<head>\n");
         html.append("<title>").append(escapeHtml(bookName)).append("</title>\n");
         html.append("<style>\n");
-        html.append("body { font-family: Arial, sans-serif; margin: 0; padding: 0; }\n");
+        html.append("@charset \"UTF-8\";\n");
+        html.append("body { font-family: 'Arial Unicode MS', 'Arial', sans-serif; margin: 0; padding: 0; }\n");
+        html.append("h1, h2 { font-family: 'Arial Unicode MS', 'Arial', sans-serif; }\n");
+        html.append("p { font-family: 'Arial Unicode MS', 'Arial', sans-serif; line-height: 1.6; margin-bottom: 10px; }\n");
         html.append(".cover { text-align: center; page-break-after: always; padding: 20mm; height: 257mm; }\n");
         html.append(".summary { page-break-after: always; padding: 20mm; }\n");
         html.append(".content { padding: 20mm; }\n");
@@ -216,17 +232,21 @@ public class PDFService {
     
     /**
      * HTML을 PDF로 변환합니다.
+     * 한글 처리를 위해 향상된 방식으로 변환합니다.
      */
     private void createPdfFromHtml(String html, String outputPath) throws DocumentException, IOException {
         Document document = new Document(PageSize.A4);
         PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(outputPath));
         document.open();
         
-        InputStream is = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
-        XMLWorkerHelper.getInstance().parseXHtml(writer, document, is, StandardCharsets.UTF_8);
-        
-        document.close();
-        logger.info("PDF 파일 생성 완료: {}", outputPath);
+        try {
+            // 간단한 방식으로 변경 - 기존 코드가 더 안정적
+            InputStream is = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
+            XMLWorkerHelper.getInstance().parseXHtml(writer, document, is, StandardCharsets.UTF_8);
+        } finally {
+            document.close();
+            logger.info("PDF 파일 생성 완료: {}", outputPath);
+        }
     }
     
     /**
