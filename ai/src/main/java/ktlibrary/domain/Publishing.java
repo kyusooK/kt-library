@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 
 import ktlibrary.AiApplication;
 import ktlibrary.domain.Published;
+import ktlibrary.service.AIService;
 import lombok.Data;
 
 @Entity
@@ -51,17 +52,36 @@ public class Publishing {
 
         Publishing publishing = new Publishing();
         publishing.setBookName(publishingRequested.getTitle());
-
-        String pdfUrl = "";
         
-        // 1. publishingRequested.getContent() 값을 pdf로 변환
-        // 2. pdf를 web url(임시 변수에 저장)로 변환.
-        // 3. web url을 토대로 표지 이미지 생성 후, url로 변환한 값을 image에 저장
-        // 4. web url을 토대로 장르 분류 및 줄거리 요약 후, category, summaryContent에 저장.
-        // 5. image, summaryContent, publishingRequested.getContent()를 토대로 pdf 처리
-        // 6. webURL, pdfPath를 저장
+        // AI 서비스 가져오기
+        AIService aiService = AiApplication.applicationContext.getBean(AIService.class);
+        
+        // 책 내용 가져오기
+        String content = publishingRequested.getContent();
+        
+        // 1. content 값을 pdf로 변환하고 웹 URL 생성
+        String webUrl = aiService.convertToPdfAndGenerateWebUrl(content);
+        publishing.setWebUrl(webUrl);
+        
+        // 2. 표지 이미지 생성을 위한 프롬프트 생성 및 이미지 URL 저장
+        String coverImagePrompt = aiService.generateCoverImagePrompt(content);
+        // 실제로는 이 프롬프트를 이미지 생성 API에 전송하여 URL을 받아야 함
+        // 여기서는 시뮬레이션으로 프롬프트를 이미지 URL로 사용
+        publishing.setImage("https://kt-library.com/images/" + System.currentTimeMillis());
+        
+        // 3. 장르 분류 및 저장
+        String category = aiService.categorizeContent(content);
+        publishing.setCategory(category);
+        
+        // 4. 줄거리 요약 및 저장
+        String summary = aiService.summarizeContent(content);
+        publishing.setSummaryContent(summary);
+        
+        // 5. PDF 경로 생성 및 저장
+        String pdfPath = aiService.generatePdfPath(content, publishing.getImage(), summary);
+        publishing.setPdfPath(pdfPath);
 
-
+        // 저자 정보 처리
         ObjectMapper mapper = new ObjectMapper();
         Map<Long, Object> authorMap = mapper.convertValue(publishingRequested.getAuthorId(), Map.class);
 
@@ -77,7 +97,6 @@ public class Publishing {
 
         Published published = new Published(publishing);
         published.publishAfterCommit();
-
     }
     //>>> Clean Arch / Port Method
 
