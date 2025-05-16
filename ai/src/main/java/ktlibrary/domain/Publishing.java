@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.persistence.*;
 
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,8 @@ import ktlibrary.service.AIService;
 import ktlibrary.service.PDFService;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Entity
 @Table(name = "Publishing_table")
@@ -24,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 //<<< DDD / Aggregate Root
 public class Publishing {
+    private static final Logger logger = LoggerFactory.getLogger(Publishing.class);
+    private static final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -56,90 +61,114 @@ public class Publishing {
 
     //<<< Clean Arch / Port Method
     public static void publish(PublishingRequested publishingRequested) {
-        System.out.println("\n===== AI 출판 처리 시작 =====");
-        
-        Publishing publishing = new Publishing();
-        publishing.setBookName(publishingRequested.getTitle());
-        System.out.println("책 제목: " + publishingRequested.getTitle());
-        
-        // AI 서비스 가져오기
-        AIService aiService = AiApplication.applicationContext.getBean(AIService.class);
-        // PDF 서비스 가져오기
-        PDFService pdfService = AiApplication.applicationContext.getBean(PDFService.class);
-        
-        // 책 내용 가져오기
-        String content = publishingRequested.getContent();
-        System.out.println("책 내용 길이: " + content.length() + "자");
-        
-        // 1. content 값을 기반으로 웹 URL 생성
-        String webUrl = aiService.convertToPdfAndGenerateWebUrl(content);
-        publishing.setWebUrl(webUrl);
-        System.out.println("생성된 웹 URL: " + webUrl);
-        
-        // 2. 표지 이미지 생성을 위한 프롬프트 생성
-        String coverImagePrompt = aiService.generateCoverImagePrompt(content);
-        System.out.println("이미지 생성 프롬프트: " + coverImagePrompt);
-        
-        // 3. DALL-E API를 사용하여 실제 이미지 생성 및 URL 저장
-        try {
-            System.out.println("이미지 생성 API 호출 중...");
-            String imageUrl = aiService.generateImage(coverImagePrompt);
-            publishing.setImage(imageUrl);
-            System.out.println("생성된 이미지 URL: " + imageUrl);
-        } catch (Exception e) {
-            // API 호출 실패 시 기본 이미지 사용
-            publishing.setImage("https://kt-library.com/images/default-cover.jpg");
-            System.err.println("이미지 생성 API 호출 실패: " + e.getMessage());
-            e.printStackTrace();
+        // 동시에 여러 요청이 처리되는 것을 방지
+        if (!isProcessing.compareAndSet(false, true)) {
+            logger.warn("이미 출판 처리가 진행 중입니다. 요청이 무시됩니다.");
+            return;
         }
         
-        // 4. 장르 분류 및 저장
-        System.out.println("카테고리 분류 중...");
-        String category = aiService.categorizeContent(content);
-        publishing.setCategory(category);
-        System.out.println("분류된 카테고리: " + category);
-        
-        // 5. 줄거리 요약 및 저장
-        System.out.println("내용 요약 중...");
-        String summary = aiService.summarizeContent(content);
-        publishing.setSummaryContent(summary);
-        System.out.println("요약된 내용: " + summary);
-        
-        // 6. 저자 정보 처리
-        ObjectMapper mapper = new ObjectMapper();
-        Map<Long, Object> authorMap = mapper.convertValue(publishingRequested.getAuthorId(), Map.class);
-
-        Long authorId = Long.valueOf(authorMap.get("id").toString());
-        System.out.println("저자 ID: " + authorId);
-
-        RestTemplate restTemplate = new RestTemplate();
-        String authorServiceUrl = "http://localhost:8082/authors/" + authorId;
-
         try {
-            ResponseEntity<Map> authorResponse = restTemplate.getForEntity(authorServiceUrl, Map.class);
-            publishing.setAuthorId(authorResponse.getBody().get("authorName").toString());
-            System.out.println("저자 이름: " + publishing.getAuthorId());
+            logger.info("\n===== AI 출판 처리 시작 =====");
+            
+            // 출판 정보 객체 생성
+            Publishing publishing = new Publishing();
+            publishing.setBookName(publishingRequested.getTitle());
+            logger.info("책 제목: {}", publishingRequested.getTitle());
+            
+            // 서비스 인스턴스 가져오기
+            AIService aiService = AiApplication.applicationContext.getBean(AIService.class);
+            PDFService pdfService = AiApplication.applicationContext.getBean(PDFService.class);
+            
+            // 책 내용 가져오기
+            String content = publishingRequested.getContent();
+            if (content == null || content.trim().isEmpty()) {
+                throw new IllegalArgumentException("책 내용이 비어 있습니다.");
+            }
+            logger.info("책 내용 길이: {}자", content.length());
+            
+            // 1. content 값을 기반으로 웹 URL 생성
+            logger.info("1단계: 웹 URL 생성 시작");
+            String webUrl = aiService.convertToPdfAndGenerateWebUrl(content);
+            publishing.setWebUrl(webUrl);
+            logger.info("1단계 완료: 웹 URL 생성됨 - {}", webUrl);
+            
+            // 2. 표지 이미지 생성을 위한 프롬프트 생성
+            logger.info("2단계: 이미지 생성 프롬프트 생성 시작");
+            String coverImagePrompt = aiService.generateCoverImagePrompt(content);
+            logger.info("2단계 완료: 이미지 생성 프롬프트 - {}", coverImagePrompt);
+            
+            // 3. DALL-E API를 사용하여 실제 이미지 생성 및 URL 저장
+            logger.info("3단계: 이미지 생성 API 호출 시작");
+            String imageUrl = null;
+            try {
+                imageUrl = aiService.generateImage(coverImagePrompt);
+                publishing.setImage(imageUrl);
+                logger.info("3단계 완료: 이미지 URL 생성됨 - {}", imageUrl);
+            } catch (Exception e) {
+                // API 호출 실패 시 기본 이미지 사용
+                logger.error("이미지 생성 API 호출 실패: {}", e.getMessage());
+                publishing.setImage("https://kt-library.com/images/default-cover.jpg");
+            }
+            
+            // 4. 장르 분류 및 저장
+            logger.info("4단계: 카테고리 분류 시작");
+            String category = aiService.categorizeContent(content);
+            publishing.setCategory(category);
+            logger.info("4단계 완료: 분류된 카테고리 - {}", category);
+            
+            // 5. 줄거리 요약 및 저장
+            logger.info("5단계: 내용 요약 시작");
+            String summary = aiService.summarizeContent(content);
+            publishing.setSummaryContent(summary);
+            logger.info("5단계 완료: 요약 완료 ({}자)", summary.length());
+            
+            // 6. 저자 정보 처리
+            logger.info("6단계: 저자 정보 처리 시작");
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                Map<Long, Object> authorMap = mapper.convertValue(publishingRequested.getAuthorId(), Map.class);
+                Long authorId = Long.valueOf(authorMap.get("id").toString());
+                logger.info("저자 ID: {}", authorId);
+                
+                RestTemplate restTemplate = new RestTemplate();
+                String authorServiceUrl = "http://localhost:8082/authors/" + authorId;
+                ResponseEntity<Map> authorResponse = restTemplate.getForEntity(authorServiceUrl, Map.class);
+                
+                publishing.setAuthorId(authorResponse.getBody().get("authorName").toString());
+                logger.info("6단계 완료: 저자 이름 - {}", publishing.getAuthorId());
+            } catch (Exception e) {
+                logger.error("저자 정보 조회 실패: {}", e.getMessage());
+                publishing.setAuthorId("알 수 없는 저자");
+            }
+            
+            // 7. 모든 정보가 준비된 후 PDF 생성 (PDFService 직접 호출)
+            logger.info("7단계: PDF 생성 시작");
+            String pdfPath = pdfService.generatePdf(
+                content, 
+                publishing.getImage(), 
+                publishing.getSummaryContent(), 
+                publishing.getBookName());
+            publishing.setPdfPath(pdfPath);
+            logger.info("7단계 완료: PDF 생성됨 - {}", pdfPath);
+    
+            // 8. 출판 정보 저장
+            logger.info("8단계: 출판 정보 저장 시작");
+            repository().save(publishing);
+            logger.info("8단계 완료: 출판 정보 저장됨");
+    
+            // 9. 이벤트 발행
+            logger.info("9단계: 출판 이벤트 발행 시작");
+            Published published = new Published(publishing);
+            published.publishAfterCommit();
+            logger.info("9단계 완료: 출판 이벤트 발행됨");
+            
+            logger.info("===== AI 출판 처리 완료 =====\n");
         } catch (Exception e) {
-            System.err.println("저자 정보 조회 실패: " + e.getMessage());
-            publishing.setAuthorId("알 수 없는 저자");
+            logger.error("출판 처리 중 오류 발생: {}", e.getMessage(), e);
+        } finally {
+            // 처리 상태 초기화 - 다음 요청을 받을 수 있도록 함
+            isProcessing.set(false);
         }
-        
-        // 7. 모든 정보가 준비된 후 PDF 생성 (PDFService 직접 호출)
-        System.out.println("PDF 생성 시작...");
-        String pdfPath = pdfService.generatePdf(content, publishing.getImage(), publishing.getSummaryContent(), publishing.getBookName());
-        publishing.setPdfPath(pdfPath);
-        System.out.println("생성된 PDF 경로: " + pdfPath);
-
-        // 출판 정보 저장
-        repository().save(publishing);
-        System.out.println("출판 정보 저장 완료");
-
-        // 이벤트 발행
-        Published published = new Published(publishing);
-        published.publishAfterCommit();
-        System.out.println("출판 이벤트 발행 완료");
-        
-        System.out.println("===== AI 출판 처리 완료 =====\n");
     }
     //>>> Clean Arch / Port Method
 

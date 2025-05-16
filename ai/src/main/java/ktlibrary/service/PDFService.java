@@ -18,12 +18,31 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.PostConstruct;
 
 @Service
 public class PDFService {
 
+    private static final Logger logger = LoggerFactory.getLogger(PDFService.class);
+    
+    // 모든 페이지에서 사용할 표준 폰트 정의
+    private static final PDFont TITLE_FONT = PDType1Font.HELVETICA_BOLD;
+    private static final PDFont NORMAL_FONT = PDType1Font.HELVETICA;
+    private static final PDFont BOLD_FONT = PDType1Font.HELVETICA_BOLD;
+    private static final PDFont HEADING1_FONT = PDType1Font.HELVETICA_BOLD;
+    private static final PDFont HEADING2_FONT = PDType1Font.HELVETICA_BOLD;
+    
+    private static final float TITLE_FONT_SIZE = 24;
+    private static final float HEADING1_FONT_SIZE = 18;
+    private static final float HEADING2_FONT_SIZE = 16;
+    private static final float NORMAL_FONT_SIZE = 11;
+    private static final float SMALL_FONT_SIZE = 10;
+    private static final float LEADING = 14.5f;
+    
     @Value("${app.storage.path:./storage}")
     private String storagePath;
 
@@ -176,7 +195,7 @@ public class PDFService {
             
             // 제목 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA_BOLD, 24);
+            contentStream.setFont(TITLE_FONT, TITLE_FONT_SIZE);
             
             // 제목 가운데 정렬을 위한 계산
             float titleWidth = bookName.length() * 14; // 대략적인 제목 너비
@@ -185,13 +204,13 @@ public class PDFService {
             
             contentStream.newLineAtOffset(titleX, height - 50);
             contentStream.showText(bookName);
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
             
             // 이미지 추가 시도
             try {
                 if (imageUrl != null && !imageUrl.trim().isEmpty() && !imageUrl.contains("default-cover")) {
                     // 원격 이미지 다운로드
-                    System.out.println("[PDFService] 표지 이미지 다운로드 시도: " + imageUrl);
+                    logger.info("[PDFService] 표지 이미지 다운로드 시도: {}", imageUrl);
                     URL url = new URL(imageUrl);
                     PDImageXObject image = PDImageXObject.createFromByteArray(document, downloadImage(url), "Cover Image");
 
@@ -210,34 +229,37 @@ public class PDFService {
                     float imgY = (height - 100 - imgHeight) / 2;
                     
                     contentStream.drawImage(image, imgX, imgY, imgWidth, imgHeight);
-                    System.out.println("[PDFService] 표지 이미지 추가 완료");
+                    logger.info("[PDFService] 표지 이미지 추가 완료");
                 } else {
                     // 이미지 없음 텍스트 표시
                     contentStream.beginText();
-                    contentStream.setFont(PDType1Font.HELVETICA_BOLD, 20);
+                    contentStream.setFont(BOLD_FONT, 20);
                     contentStream.newLineAtOffset((width - 200) / 2, height / 2);
                     contentStream.showText("표지 이미지 없음");
-                    contentStream.endText();
+                    contentStream.endText();  // 명시적으로 endText() 호출
                 }
             } catch (Exception e) {
-                System.err.println("[PDFService] 표지 이미지 추가 실패: " + e.getMessage());
+                logger.error("[PDFService] 표지 이미지 추가 실패: {}", e.getMessage());
                 
                 // 이미지 추가 실패 시 텍스트로 대체
                 contentStream.beginText();
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 20);
+                contentStream.setFont(BOLD_FONT, 20);
                 contentStream.newLineAtOffset((width - 200) / 2, height / 2);
                 contentStream.showText("표지 이미지 로드 실패");
-                contentStream.endText();
+                contentStream.endText();  // 명시적으로 endText() 호출
             }
             
             // 페이지 하단에 페이지 번호 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA, 10);
+            contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
             contentStream.newLineAtOffset(width / 2 - 10, 30);
             contentStream.showText("1");
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
         } finally {
-            contentStream.close();
+            // 항상 contentStream 닫기
+            if (contentStream != null) {
+                contentStream.close();
+            }
         }
     }
     
@@ -259,10 +281,10 @@ public class PDFService {
             
             // 제목 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA_BOLD, 18);
+            contentStream.setFont(HEADING1_FONT, HEADING1_FONT_SIZE);
             contentStream.newLineAtOffset(margin, yPosition);
             contentStream.showText(bookName + " - 요약");
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
             
             yPosition -= 40;
             
@@ -276,8 +298,8 @@ public class PDFService {
             
             // 요약 내용 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA, 12);
-            contentStream.setLeading(14.5f);
+            contentStream.setFont(NORMAL_FONT, NORMAL_FONT_SIZE);
+            contentStream.setLeading(LEADING);
             contentStream.newLineAtOffset(margin, yPosition);
             
             // 텍스트 줄바꿈 처리 (한글 텍스트는 고정 길이로 처리)
@@ -318,16 +340,19 @@ public class PDFService {
                 contentStream.showText("요약 내용이 없습니다.");
             }
             
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
             
             // 페이지 하단에 페이지 번호 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA, 10);
+            contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
             contentStream.newLineAtOffset(width / 2 - 10, 30);
             contentStream.showText("2");
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
         } finally {
-            contentStream.close();
+            // 항상 contentStream 닫기
+            if (contentStream != null) {
+                contentStream.close();
+            }
         }
     }
     
@@ -336,7 +361,7 @@ public class PDFService {
      */
     private void createContentPages(PDDocument document, String content) throws IOException {
         if (content == null || content.isEmpty()) {
-            System.out.println("[PDFService] 내용이 없어 내용 페이지를 생성하지 않습니다.");
+            logger.info("[PDFService] 내용이 없어 내용 페이지를 생성하지 않습니다.");
             return;
         }
         
@@ -344,29 +369,30 @@ public class PDFService {
         PDPage contentPage = new PDPage(PDRectangle.A4);
         document.addPage(contentPage);
         
-        float fontSize = 11;
-        float leading = 14.5f;
-        
-        PDPageContentStream contentStream = null;
         // 이미 2페이지가 있으므로 내용은 3페이지부터 시작
         int pageCount = 3;
+        
+        PDPageContentStream contentStream = null;
+        float yPosition = 0;
+        float width = 0;
+        float height = 0;
+        float margin = 50;
         
         try {
             contentStream = new PDPageContentStream(document, contentPage);
             
             // 페이지 크기 가져오기
-            float width = contentPage.getMediaBox().getWidth();
-            float height = contentPage.getMediaBox().getHeight();
-            float margin = 50;
+            width = contentPage.getMediaBox().getWidth();
+            height = contentPage.getMediaBox().getHeight();
             float yStart = height - margin;
-            float yPosition = yStart;
+            yPosition = yStart;
             
             // 제목 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA_BOLD, 16);
+            contentStream.setFont(HEADING2_FONT, HEADING2_FONT_SIZE);
             contentStream.newLineAtOffset(margin, yPosition);
             contentStream.showText("책 내용");
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
             
             // 구분선 추가
             yPosition -= 20;
@@ -377,22 +403,32 @@ public class PDFService {
             
             yPosition -= 30; // 제목과 내용 사이 간격
             
-            // 내용 추가
+            // 내용 추가 - 새로운 텍스트 블록 시작
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA, fontSize);
-            contentStream.setLeading(leading);
+            contentStream.setFont(NORMAL_FONT, NORMAL_FONT_SIZE);
+            contentStream.setLeading(LEADING);
             contentStream.newLineAtOffset(margin, yPosition);
             
             // 텍스트 줄바꿈 처리
             String[] paragraphs = content.split("\n");
+            boolean needNewPage = false;
             
             for (int i = 0; i < paragraphs.length; i++) {
                 String paragraph = paragraphs[i];
                 
                 // 현재 y 위치가 하단 여백보다 작으면 새 페이지 생성
-                if (yPosition < margin + 50) {
+                if (yPosition < margin + 50 || needNewPage) {
+                    // 현재 텍스트 블록 종료
+                    contentStream.endText();  // 명시적으로 endText() 호출
+                    
+                    // 페이지 번호 추가
+                    contentStream.beginText();
+                    contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
+                    contentStream.newLineAtOffset(width / 2 - 10, 30);
+                    contentStream.showText(String.valueOf(pageCount));
+                    contentStream.endText();  // 명시적으로 endText() 호출
+                    
                     // 현재 스트림 종료
-                    contentStream.endText();
                     contentStream.close();
                     
                     // 새 페이지 생성
@@ -402,16 +438,19 @@ public class PDFService {
                     
                     // 새 스트림 생성
                     contentStream = new PDPageContentStream(document, contentPage);
+                    
+                    // 새 텍스트 블록 시작
                     contentStream.beginText();
-                    contentStream.setFont(PDType1Font.HELVETICA, fontSize);
-                    contentStream.setLeading(leading);
+                    contentStream.setFont(NORMAL_FONT, NORMAL_FONT_SIZE);
+                    contentStream.setLeading(LEADING);
                     contentStream.newLineAtOffset(margin, yStart);
                     yPosition = yStart;
+                    needNewPage = false;
                 }
                 
                 if (paragraph.trim().isEmpty()) {
                     contentStream.newLine();
-                    yPosition -= leading;
+                    yPosition -= LEADING;
                     continue;
                 }
                 
@@ -428,79 +467,63 @@ public class PDFService {
                     if (charPosition >= 60) {
                         contentStream.showText(line.toString());
                         contentStream.newLine();
-                        yPosition -= leading;
+                        yPosition -= LEADING;
                         line = new StringBuilder();
                         charPosition = 0;
                         
                         // 페이지 넘김 체크
                         if (yPosition < margin + 50) {
-                            // 현재 스트림 종료
-                            contentStream.endText();
-                            contentStream.close();
-                            
-                            // 새 페이지 생성
-                            contentPage = new PDPage(PDRectangle.A4);
-                            document.addPage(contentPage);
-                            pageCount++;
-                            
-                            // 새 스트림 생성
-                            contentStream = new PDPageContentStream(document, contentPage);
-                            contentStream.beginText();
-                            contentStream.setFont(PDType1Font.HELVETICA, fontSize);
-                            contentStream.setLeading(leading);
-                            contentStream.newLineAtOffset(margin, yStart);
-                            yPosition = yStart;
+                            needNewPage = true;
+                            break;
                         }
                     }
+                }
+                
+                // 현재 단락에서 페이지 넘김이 필요한 경우 다음 반복으로 넘어감
+                if (needNewPage) {
+                    i--;  // 현재 단락을 다음 페이지에서 다시 처리
+                    continue;
                 }
                 
                 // 남은 텍스트 처리
                 if (line.length() > 0) {
                     contentStream.showText(line.toString());
                     contentStream.newLine();
-                    yPosition -= leading;
+                    yPosition -= LEADING;
                 }
                 
                 // 문단 사이 줄바꿈
                 contentStream.newLine();
-                yPosition -= leading;
+                yPosition -= LEADING;
                 
                 // 페이지 넘김 체크
                 if (yPosition < margin + 50 && i < paragraphs.length - 1) {
-                    // 현재 스트림 종료
-                    contentStream.endText();
-                    contentStream.close();
-                    
-                    // 새 페이지 생성
-                    contentPage = new PDPage(PDRectangle.A4);
-                    document.addPage(contentPage);
-                    pageCount++;
-                    
-                    // 새 스트림 생성
-                    contentStream = new PDPageContentStream(document, contentPage);
-                    contentStream.beginText();
-                    contentStream.setFont(PDType1Font.HELVETICA, fontSize);
-                    contentStream.setLeading(leading);
-                    contentStream.newLineAtOffset(margin, yStart);
-                    yPosition = yStart;
+                    needNewPage = true;
                 }
             }
             
-            // 페이지 번호 추가
-            contentStream.endText();
+            // 마지막 텍스트 블록 종료
+            contentStream.endText();  // 명시적으로 endText() 호출
+            
+            // 마지막 페이지 번호 추가
             contentStream.beginText();
-            contentStream.setFont(PDType1Font.HELVETICA, 10);
+            contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
             contentStream.newLineAtOffset(width / 2 - 10, 30);
             contentStream.showText(String.valueOf(pageCount));
-            contentStream.endText();
+            contentStream.endText();  // 명시적으로 endText() 호출
             
         } finally {
+            // 항상 contentStream 닫기
             if (contentStream != null) {
-                contentStream.close();
+                try {
+                    contentStream.close();
+                } catch (IOException e) {
+                    logger.error("[PDFService] 컨텐츠 스트림 닫기 오류: {}", e.getMessage());
+                }
             }
         }
         
-        System.out.println("[PDFService] PDF 생성 완료: 총 " + pageCount + "페이지");
+        logger.info("[PDFService] PDF 생성 완료: 총 {} 페이지", pageCount);
     }
     
     /**
