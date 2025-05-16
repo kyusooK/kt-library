@@ -103,7 +103,7 @@ public class Publishing {
         System.out.println("요약된 내용: " + summary);
         
         // 6. PDF 경로 생성 및 저장
-        String pdfPath = aiService.generatePdfPath(content, publishing.getImage(), summary);
+        String pdfPath = aiService.generatePdfPath(content, publishing.getImage(), summary, publishing.getBookName());
         publishing.setPdfPath(pdfPath);
         System.out.println("생성된 PDF 경로: " + pdfPath);
 

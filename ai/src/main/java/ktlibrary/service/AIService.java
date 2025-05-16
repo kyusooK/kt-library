@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -24,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 @Slf4j
@@ -46,10 +46,13 @@ public class AIService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final PDFService pdfService;
 
-    public AIService(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    @Autowired
+    public AIService(RestTemplate restTemplate, ObjectMapper objectMapper, PDFService pdfService) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.pdfService = pdfService;
     }
     
     @PostConstruct
@@ -315,54 +318,16 @@ public class AIService {
 
     /**
      * 책 내용, 이미지, 요약을 기반으로 PDF를 생성하고 경로를 반환합니다.
+     * PDFService를 사용하여 PDF 파일을 생성합니다.
      * @param content 책 내용
      * @param imageUrl 표지 이미지 URL
      * @param summary 요약 내용
+     * @param bookName 책 제목
      * @return 생성된 PDF 경로
      */
-    public String generatePdfPath(String content, String imageUrl, String summary) {
-        System.out.println("[AIService] PDF 경로 생성 시작");
-        
-        try {
-            // 경로 확인 및 재설정
-            if (storagePath == null || storagePath.trim().isEmpty()) {
-                storagePath = "./storage";
-                System.out.println("[AIService] 스토리지 경로가 설정되지 않아 기본값으로 설정: " + storagePath);
-            }
-            
-            // 고유 ID 생성
-            String uniqueId = String.valueOf(System.currentTimeMillis());
-            
-            // PDF 디렉토리 확인 및 생성
-            Path pdfDir = Paths.get(storagePath, "pdfs");
-            if (!Files.exists(pdfDir)) {
-                Files.createDirectories(pdfDir);
-                System.out.println("[AIService] PDF 디렉토리 다시 생성: " + pdfDir.toAbsolutePath());
-            }
-            
-            Path textFilePath = pdfDir.resolve(uniqueId + ".txt");
-            
-            // 텍스트 파일에 내용 작성
-            String fileContent = "이미지 URL: " + imageUrl + "\n\n"
-                    + "요약:\n" + summary + "\n\n"
-                    + "내용:\n" + content;
-            
-            // 파일 저장 전 경로 확인
-            System.out.println("[AIService] 텍스트 파일 저장 경로: " + textFilePath.toAbsolutePath());
-            System.out.println("[AIService] 상위 디렉토리 존재 여부: " + Files.exists(textFilePath.getParent()));
-            
-            Files.writeString(textFilePath, fileContent, StandardCharsets.UTF_8);
-            System.out.println("[AIService] 텍스트 파일 생성 완료: " + textFilePath.toAbsolutePath());
-            
-            String pdfPath = textFilePath.toAbsolutePath().toString();
-            System.out.println("[AIService] 생성된 PDF 경로: " + pdfPath);
-            
-            return pdfPath;
-        } catch (IOException e) {
-            System.err.println("[AIService] PDF 생성 중 오류 발생: " + e.getMessage());
-            e.printStackTrace();
-            return "/storage/pdfs/error.txt";
-        }
+    public String generatePdfPath(String content, String imageUrl, String summary, String bookName) {
+        System.out.println("[AIService] PDF 생성 요청 시작");
+        return pdfService.generatePdf(content, imageUrl, summary, bookName);
     }
 
     private Map<String, Object> createChatCompletionRequest(String prompt) {
