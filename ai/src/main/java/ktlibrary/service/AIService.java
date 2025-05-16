@@ -46,13 +46,11 @@ public class AIService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final PDFService pdfService;
 
     @Autowired
-    public AIService(RestTemplate restTemplate, ObjectMapper objectMapper, PDFService pdfService) {
+    public AIService(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
-        this.pdfService = pdfService;
     }
     
     @PostConstruct
@@ -255,7 +253,7 @@ public class AIService {
      * @return 생성된 웹 URL
      */
     public String convertToPdfAndGenerateWebUrl(String content) {
-        System.out.println("[AIService] PDF 변환 및 웹 URL 생성 시작");
+        System.out.println("[AIService] 웹 URL 생성 시작");
         
         try {
             // 경로 확인 및 재설정
@@ -314,20 +312,6 @@ public class AIService {
             e.printStackTrace();
             return baseUrl + "/books/error";
         }
-    }
-
-    /**
-     * 책 내용, 이미지, 요약을 기반으로 PDF를 생성하고 경로를 반환합니다.
-     * PDFService를 사용하여 PDF 파일을 생성합니다.
-     * @param content 책 내용
-     * @param imageUrl 표지 이미지 URL
-     * @param summary 요약 내용
-     * @param bookName 책 제목
-     * @return 생성된 PDF 경로
-     */
-    public String generatePdfPath(String content, String imageUrl, String summary, String bookName) {
-        System.out.println("[AIService] PDF 생성 요청 시작");
-        return pdfService.generatePdf(content, imageUrl, summary, bookName);
     }
 
     private Map<String, Object> createChatCompletionRequest(String prompt) {

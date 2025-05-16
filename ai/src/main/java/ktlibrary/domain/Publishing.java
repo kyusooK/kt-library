@@ -14,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import ktlibrary.AiApplication;
 import ktlibrary.domain.Published;
 import ktlibrary.service.AIService;
+import ktlibrary.service.PDFService;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -63,12 +64,14 @@ public class Publishing {
         
         // AI 서비스 가져오기
         AIService aiService = AiApplication.applicationContext.getBean(AIService.class);
+        // PDF 서비스 가져오기
+        PDFService pdfService = AiApplication.applicationContext.getBean(PDFService.class);
         
         // 책 내용 가져오기
         String content = publishingRequested.getContent();
         System.out.println("책 내용 길이: " + content.length() + "자");
         
-        // 1. content 값을 pdf로 변환하고 웹 URL 생성
+        // 1. content 값을 기반으로 웹 URL 생성
         String webUrl = aiService.convertToPdfAndGenerateWebUrl(content);
         publishing.setWebUrl(webUrl);
         System.out.println("생성된 웹 URL: " + webUrl);
@@ -102,12 +105,7 @@ public class Publishing {
         publishing.setSummaryContent(summary);
         System.out.println("요약된 내용: " + summary);
         
-        // 6. PDF 경로 생성 및 저장
-        String pdfPath = aiService.generatePdfPath(content, publishing.getImage(), summary, publishing.getBookName());
-        publishing.setPdfPath(pdfPath);
-        System.out.println("생성된 PDF 경로: " + pdfPath);
-
-        // 저자 정보 처리
+        // 6. 저자 정보 처리
         ObjectMapper mapper = new ObjectMapper();
         Map<Long, Object> authorMap = mapper.convertValue(publishingRequested.getAuthorId(), Map.class);
 
@@ -125,10 +123,18 @@ public class Publishing {
             System.err.println("저자 정보 조회 실패: " + e.getMessage());
             publishing.setAuthorId("알 수 없는 저자");
         }
+        
+        // 7. 모든 정보가 준비된 후 PDF 생성 (PDFService 직접 호출)
+        System.out.println("PDF 생성 시작...");
+        String pdfPath = pdfService.generatePdf(content, publishing.getImage(), publishing.getSummaryContent(), publishing.getBookName());
+        publishing.setPdfPath(pdfPath);
+        System.out.println("생성된 PDF 경로: " + pdfPath);
 
+        // 출판 정보 저장
         repository().save(publishing);
         System.out.println("출판 정보 저장 완료");
 
+        // 이벤트 발행
         Published published = new Published(publishing);
         published.publishAfterCommit();
         System.out.println("출판 이벤트 발행 완료");
