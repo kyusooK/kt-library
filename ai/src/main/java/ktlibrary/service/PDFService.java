@@ -134,85 +134,81 @@ public class PDFService {
     private String generateHtml(String content, String imageUrl, String summary, String bookName) {
         StringBuilder html = new StringBuilder();
         
-        html.append("<!DOCTYPE html>");
-        html.append("<html>");
-        html.append("<head>");
-        html.append("<meta charset=\"UTF-8\">");
-        html.append("<title>").append(escapeHtml(bookName)).append("</title>");
-        html.append("<style>");
-        html.append("body { font-family: Arial, sans-serif; margin: 0; padding: 0; }");
-        html.append(".cover { text-align: center; page-break-after: always; padding: 20mm; height: 257mm; }");
-        html.append(".cover h1 { font-size: 24pt; margin-bottom: 20mm; }");
-        html.append(".cover img { max-width: 80%; max-height: 180mm; }");
-        html.append(".summary { page-break-after: always; padding: 20mm; }");
-        html.append(".summary h2 { font-size: 18pt; margin-bottom: 10mm; }");
-        html.append(".content { padding: 20mm; }");
-        html.append(".content h2 { font-size: 18pt; margin-bottom: 10mm; }");
-        html.append("p { line-height: 1.5; margin-bottom: 5mm; }");
-        html.append("</style>");
-        html.append("</head>");
-        html.append("<body>");
+        // XML 파서가 더 잘 처리할 수 있도록 간단한 HTML 구조 사용
+        html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
+        html.append("<head>\n");
+        html.append("<title>").append(escapeHtml(bookName)).append("</title>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: Arial, sans-serif; margin: 0; padding: 0; }\n");
+        html.append(".cover { text-align: center; page-break-after: always; padding: 20mm; height: 257mm; }\n");
+        html.append(".summary { page-break-after: always; padding: 20mm; }\n");
+        html.append(".content { padding: 20mm; }\n");
+        html.append("</style>\n");
+        html.append("</head>\n");
+        html.append("<body>\n");
         
         // 표지 페이지
-        html.append("<div class=\"cover\">");
-        html.append("<h1>").append(escapeHtml(bookName)).append("</h1>");
+        html.append("<div class=\"cover\">\n");
+        html.append("<h1>").append(escapeHtml(bookName)).append("</h1>\n");
         
         // 이미지 추가
         if (imageUrl != null && !imageUrl.trim().isEmpty()) {
             try {
                 String base64Image = getBase64Image(imageUrl);
                 if (base64Image != null) {
-                    html.append("<img src=\"data:image/jpeg;base64,").append(base64Image).append("\" />");
+                    html.append("<img src=\"data:image/jpeg;base64,").append(base64Image).append("\" />\n");
                 } else {
-                    html.append("<p>Image not available</p>");
+                    html.append("<p>Image not available</p>\n");
                 }
             } catch (Exception e) {
                 logger.error("이미지 처리 오류: {}", e.getMessage());
-                html.append("<p>Image loading error</p>");
+                html.append("<p>Image loading error</p>\n");
             }
         } else {
-            html.append("<p>No image available</p>");
+            html.append("<p>No image available</p>\n");
         }
         
-        html.append("</div>");
+        html.append("</div>\n");
         
         // 요약 페이지
-        html.append("<div class=\"summary\">");
-        html.append("<h2>").append(escapeHtml(bookName)).append(" - Summary</h2>");
+        html.append("<div class=\"summary\">\n");
+        html.append("<h2>").append(escapeHtml(bookName)).append(" - Summary</h2>\n");
         
         if (summary != null && !summary.trim().isEmpty()) {
             // 요약 내용을 문단으로 분할
             String[] paragraphs = summary.split("\n");
             for (String paragraph : paragraphs) {
                 if (!paragraph.trim().isEmpty()) {
-                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>");
+                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>\n");
                 }
             }
         } else {
-            html.append("<p>No summary available</p>");
+            html.append("<p>No summary available</p>\n");
         }
         
-        html.append("</div>");
+        html.append("</div>\n");
         
         // 내용 페이지
-        html.append("<div class=\"content\">");
-        html.append("<h2>Book Content</h2>");
+        html.append("<div class=\"content\">\n");
+        html.append("<h2>Book Content</h2>\n");
         
         if (content != null && !content.trim().isEmpty()) {
             // 내용을 문단으로 분할
             String[] paragraphs = content.split("\n");
             for (String paragraph : paragraphs) {
                 if (!paragraph.trim().isEmpty()) {
-                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>");
+                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>\n");
                 }
             }
         } else {
-            html.append("<p>No content available</p>");
+            html.append("<p>No content available</p>\n");
         }
         
-        html.append("</div>");
+        html.append("</div>\n");
         
-        html.append("</body>");
+        html.append("</body>\n");
         html.append("</html>");
         
         return html.toString();
