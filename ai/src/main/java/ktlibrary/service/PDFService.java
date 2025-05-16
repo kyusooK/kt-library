@@ -17,7 +17,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,9 +29,9 @@ public class PDFService {
 
     private static final Logger logger = LoggerFactory.getLogger(PDFService.class);
     
-    // 폰트 정의 (PDType1Font는 한글을 지원하지 않으므로 제거)
-    private PDType0Font koreanFont;
-    private PDType0Font koreanBoldFont;
+    // 기본 폰트 정의 (한글을 지원하지 않지만 안정적인 PDType1Font 사용)
+    private static final PDType1Font NORMAL_FONT = PDType1Font.HELVETICA;
+    private static final PDType1Font BOLD_FONT = PDType1Font.HELVETICA_BOLD;
     
     private static final float TITLE_FONT_SIZE = 24;
     private static final float HEADING1_FONT_SIZE = 18;
@@ -162,32 +162,6 @@ public class PDFService {
      */
     private void createPdfDocument(Path pdfPath, String content, String imageUrl, String summary, String bookName) throws IOException {
         try (PDDocument document = new PDDocument()) {
-            // 폰트 로드
-            try {
-                // PDFBox에 포함된 기본 폰트를 사용
-                InputStream fontStream = PDFService.class.getResourceAsStream("/org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf");
-                if (fontStream != null) {
-                    koreanFont = PDType0Font.load(document, fontStream);
-                    fontStream.close();
-                    
-                    fontStream = PDFService.class.getResourceAsStream("/org/apache/pdfbox/resources/ttf/LiberationSans-Bold.ttf");
-                    if (fontStream != null) {
-                        koreanBoldFont = PDType0Font.load(document, fontStream);
-                        fontStream.close();
-                    } else {
-                        koreanBoldFont = koreanFont; // 볼드 폰트가 없으면 일반 폰트로 대체
-                    }
-                    
-                    logger.info("[PDFService] Liberation Sans 폰트 로드 완료");
-                } else {
-                    logger.error("[PDFService] PDFBox 내장 폰트를 찾을 수 없습니다.");
-                    throw new IOException("PDFBox 내장 폰트를 찾을 수 없습니다.");
-                }
-            } catch (Exception e) {
-                logger.error("[PDFService] 폰트 초기화 오류: {}", e.getMessage());
-                throw new IOException("폰트 초기화 실패: " + e.getMessage(), e);
-            }
-            
             // 1페이지: 표지 이미지
             createCoverImagePage(document, imageUrl, bookName);
             
@@ -199,7 +173,7 @@ public class PDFService {
             
             // PDF 저장
             document.save(pdfPath.toFile());
-            System.out.println("[PDFService] PDF 파일 생성 완료: " + pdfPath.toAbsolutePath());
+            logger.info("[PDFService] PDF 파일 생성 완료: {}", pdfPath.toAbsolutePath());
         }
     }
 
@@ -216,20 +190,31 @@ public class PDFService {
             float width = coverPage.getMediaBox().getWidth();
             float height = coverPage.getMediaBox().getHeight();
             
-            // 제목 추가 (한글 폰트 사용)
+            // 제목 추가
             contentStream.beginText();
-            contentStream.setFont(koreanBoldFont, TITLE_FONT_SIZE);
+            contentStream.setFont(BOLD_FONT, TITLE_FONT_SIZE);
             
-            // 제목 가운데 정렬을 위한 계산 (한글은 약 14pt 너비로 계산)
-            float titleWidth = bookName.length() * 14; // 대략적인 제목 너비
+            // 변환된 제목 가져오기
+            String displayTitle = safeText(bookName, BOLD_FONT);
+            
+            // 제목 길이에 따라 가운데 정렬 계산
+            float titleWidth = BOLD_FONT.getStringWidth(displayTitle) / 1000 * TITLE_FONT_SIZE;
             float titleX = (width - titleWidth) / 2;
             if (titleX < 50) titleX = 50;
             
             contentStream.newLineAtOffset(titleX, height - 50);
             try {
-                contentStream.showText(safeText(bookName, koreanBoldFont));
+                contentStream.showText(displayTitle);
+                
+                // 원래 한글 제목이 로마자로 변환되었으면, 하단에 원제를 English Title이라고 표시
+                if (hasKorean(bookName)) {
+                    contentStream.endText();
+                    contentStream.beginText();
+                    contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
+                    contentStream.newLineAtOffset(titleX, height - 80);
+                    contentStream.showText("(영어로 변환된 제목입니다)");
+                }
             } catch (Exception e) {
-                // 폰트 관련 오류가 발생한 경우 기본 텍스트 표시
                 logger.error("[PDFService] 제목 텍스트 렌더링 실패: {}", e.getMessage());
                 contentStream.showText("Book Cover");
             }
@@ -262,9 +247,9 @@ public class PDFService {
                 } else {
                     // 이미지 없음 텍스트 표시
                     contentStream.beginText();
-                    contentStream.setFont(koreanBoldFont, 20);
+                    contentStream.setFont(BOLD_FONT, 20);
                     contentStream.newLineAtOffset((width - 200) / 2, height / 2);
-                    contentStream.showText(safeText("표지 이미지 없음", koreanBoldFont));
+                    contentStream.showText(safeText("표지 이미지 없음", BOLD_FONT));
                     contentStream.endText();  // 명시적으로 endText() 호출
                 }
             } catch (Exception e) {
@@ -272,15 +257,15 @@ public class PDFService {
                 
                 // 이미지 추가 실패 시 텍스트로 대체
                 contentStream.beginText();
-                contentStream.setFont(koreanBoldFont, 20);
+                contentStream.setFont(BOLD_FONT, 20);
                 contentStream.newLineAtOffset((width - 200) / 2, height / 2);
-                contentStream.showText(safeText("표지 이미지 로드 실패", koreanBoldFont));
+                contentStream.showText(safeText("표지 이미지 로드 실패", BOLD_FONT));
                 contentStream.endText();  // 명시적으로 endText() 호출
             }
             
             // 페이지 하단에 페이지 번호 추가
             contentStream.beginText();
-            contentStream.setFont(koreanFont, SMALL_FONT_SIZE);
+            contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
             contentStream.newLineAtOffset(width / 2 - 10, 30);
             contentStream.showText("1");
             contentStream.endText();  // 명시적으로 endText() 호출
@@ -308,14 +293,14 @@ public class PDFService {
             float yStart = height - margin;
             float yPosition = yStart;
             
-            // 제목 추가 (한글 폰트 사용)
+            // 제목 추가
             contentStream.beginText();
-            contentStream.setFont(koreanBoldFont, HEADING1_FONT_SIZE);
+            contentStream.setFont(BOLD_FONT, HEADING1_FONT_SIZE);
             contentStream.newLineAtOffset(margin, yPosition);
             try {
-                contentStream.showText(safeText(bookName + " - 요약", koreanBoldFont));
+                String summaryTitle = safeText(bookName + " - 요약", BOLD_FONT);
+                contentStream.showText(summaryTitle);
             } catch (Exception e) {
-                // 한글 문자가 지원되지 않는 경우 대체 텍스트 사용
                 logger.error("[PDFService] 요약 제목 텍스트 렌더링 실패: {}", e.getMessage());
                 contentStream.showText("Summary");
             }
@@ -331,57 +316,33 @@ public class PDFService {
             
             yPosition -= 30;
             
-            // 요약 내용 추가 (한글 폰트 사용)
+            // 요약 내용 추가
             contentStream.beginText();
-            contentStream.setFont(koreanFont, NORMAL_FONT_SIZE);
+            contentStream.setFont(NORMAL_FONT, NORMAL_FONT_SIZE);
             contentStream.setLeading(LEADING);
             contentStream.newLineAtOffset(margin, yPosition);
             
-            // 텍스트 줄바꿈 처리 (한글 텍스트는 고정 길이로 처리)
+            // 텍스트 줄바꿈 처리 (로마자로 변환된 텍스트 사용)
             if (summary != null && !summary.isEmpty()) {
-                String[] paragraphs = summary.split("\n");
-                for (String paragraph : paragraphs) {
-                    if (paragraph.trim().isEmpty()) {
-                        contentStream.newLine();
-                        continue;
-                    }
+                try {
+                    // 요약 내용 전체를 로마자로 변환
+                    String convertedSummary = safeText(summary, NORMAL_FONT);
                     
-                    // 한글 처리를 위해 한 글자씩 처리
-                    int charCount = 0;
-                    StringBuilder line = new StringBuilder();
-                    char[] chars = paragraph.toCharArray();
-                    
-                    for (int i = 0; i < chars.length; i++) {
-                        line.append(chars[i]);
-                        charCount++;
-                        
-                        // 한 줄에 약 60자 (한글 기준)
-                        if (charCount >= 60) {
-                            try {
-                                contentStream.showText(safeText(line.toString(), koreanFont));
-                            } catch (Exception e) {
-                                logger.warn("[PDFService] 텍스트 렌더링 실패: {}", e.getMessage());
-                            }
-                            contentStream.newLine();
-                            line = new StringBuilder();
-                            charCount = 0;
-                        }
-                    }
-                    
-                    if (line.length() > 0) {
-                        try {
-                            contentStream.showText(safeText(line.toString(), koreanFont));
-                        } catch (Exception e) {
-                            logger.warn("[PDFService] 텍스트 렌더링 실패: {}", e.getMessage());
-                        }
+                    // 적절한 길이로 나누어 줄바꿈 처리
+                    int lineLength = 80; // 영문 기준 한 줄 길이
+                    for (int i = 0; i < convertedSummary.length(); i += lineLength) {
+                        int endIndex = Math.min(i + lineLength, convertedSummary.length());
+                        String line = convertedSummary.substring(i, endIndex);
+                        contentStream.showText(line);
                         contentStream.newLine();
                     }
-                    
-                    contentStream.newLine(); // 문단 사이 줄바꿈
+                } catch (Exception e) {
+                    logger.warn("[PDFService] 텍스트 렌더링 실패: {}", e.getMessage());
+                    contentStream.showText("Summary text rendering failed.");
                 }
             } else {
                 try {
-                    contentStream.showText(safeText("요약 내용이 없습니다.", koreanFont));
+                    contentStream.showText(safeText("요약 내용이 없습니다.", NORMAL_FONT));
                 } catch (Exception e) {
                     contentStream.showText("No summary available.");
                 }
@@ -391,7 +352,7 @@ public class PDFService {
             
             // 페이지 하단에 페이지 번호 추가
             contentStream.beginText();
-            contentStream.setFont(koreanFont, SMALL_FONT_SIZE);
+            contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
             contentStream.newLineAtOffset(width / 2 - 10, 30);
             contentStream.showText("2");
             contentStream.endText();  // 명시적으로 endText() 호출
@@ -434,12 +395,13 @@ public class PDFService {
             float yStart = height - margin;
             yPosition = yStart;
             
-            // 제목 추가 (한글 폰트 사용)
+            // 제목 추가
             contentStream.beginText();
-            contentStream.setFont(koreanBoldFont, HEADING2_FONT_SIZE);
+            contentStream.setFont(BOLD_FONT, HEADING2_FONT_SIZE);
             contentStream.newLineAtOffset(margin, yPosition);
             try {
-                contentStream.showText(safeText("책 내용", koreanBoldFont));
+                String contentTitle = safeText("책 내용", BOLD_FONT);
+                contentStream.showText(contentTitle);
             } catch (Exception e) {
                 contentStream.showText("Content");
             }
@@ -454,18 +416,24 @@ public class PDFService {
             
             yPosition -= 30; // 제목과 내용 사이 간격
             
-            // 내용 추가 - 새로운 텍스트 블록 시작 (한글 폰트 사용)
+            // 내용 추가 - 새로운 텍스트 블록 시작
             contentStream.beginText();
-            contentStream.setFont(koreanFont, NORMAL_FONT_SIZE);
+            contentStream.setFont(NORMAL_FONT, NORMAL_FONT_SIZE);
             contentStream.setLeading(LEADING);
             contentStream.newLineAtOffset(margin, yPosition);
             
-            // 텍스트 줄바꿈 처리
-            String[] paragraphs = content.split("\n");
+            // 내용 전체를 로마자로 변환
+            String convertedContent = safeText(content, NORMAL_FONT);
+            
+            // 라인 단위로 분리
+            String[] lines = convertedContent.split("\n");
             boolean needNewPage = false;
             
-            for (int i = 0; i < paragraphs.length; i++) {
-                String paragraph = paragraphs[i];
+            int lineLength = 80; // 영문 기준 한 줄 길이
+            
+            // 각 라인을 처리
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
                 
                 // 현재 y 위치가 하단 여백보다 작으면 새 페이지 생성
                 if (yPosition < margin + 50 || needNewPage) {
@@ -474,7 +442,7 @@ public class PDFService {
                     
                     // 페이지 번호 추가
                     contentStream.beginText();
-                    contentStream.setFont(koreanFont, SMALL_FONT_SIZE);
+                    contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
                     contentStream.newLineAtOffset(width / 2 - 10, 30);
                     contentStream.showText(String.valueOf(pageCount));
                     contentStream.endText();  // 명시적으로 endText() 호출
@@ -492,71 +460,49 @@ public class PDFService {
                     
                     // 새 텍스트 블록 시작
                     contentStream.beginText();
-                    contentStream.setFont(koreanFont, NORMAL_FONT_SIZE);
+                    contentStream.setFont(NORMAL_FONT, NORMAL_FONT_SIZE);
                     contentStream.setLeading(LEADING);
                     contentStream.newLineAtOffset(margin, yStart);
                     yPosition = yStart;
                     needNewPage = false;
                 }
                 
-                if (paragraph.trim().isEmpty()) {
+                // 빈 라인 처리
+                if (line.trim().isEmpty()) {
                     contentStream.newLine();
                     yPosition -= LEADING;
                     continue;
                 }
                 
-                // 한글 처리를 위해 한 글자씩 처리
-                int charPosition = 0;
-                StringBuilder line = new StringBuilder();
-                char[] chars = paragraph.toCharArray();
-                
-                for (int j = 0; j < chars.length; j++) {
-                    line.append(chars[j]);
-                    charPosition++;
+                // 라인 길이가 긴 경우 적절히 분할
+                for (int pos = 0; pos < line.length(); pos += lineLength) {
+                    int end = Math.min(pos + lineLength, line.length());
+                    String segment = line.substring(pos, end);
                     
-                    // 적당한 길이마다 줄바꿈 (한글은 약 60자 정도)
-                    if (charPosition >= 60) {
-                        try {
-                            contentStream.showText(safeText(line.toString(), koreanFont));
-                        } catch (Exception e) {
-                            logger.warn("[PDFService] 내용 텍스트 렌더링 실패: {}", e.getMessage());
-                        }
+                    try {
+                        contentStream.showText(segment);
                         contentStream.newLine();
                         yPosition -= LEADING;
-                        line = new StringBuilder();
-                        charPosition = 0;
                         
                         // 페이지 넘김 체크
                         if (yPosition < margin + 50) {
                             needNewPage = true;
                             break;
                         }
-                    }
-                }
-                
-                // 현재 단락에서 페이지 넘김이 필요한 경우 다음 반복으로 넘어감
-                if (needNewPage) {
-                    i--;  // 현재 단락을 다음 페이지에서 다시 처리
-                    continue;
-                }
-                
-                // 남은 텍스트 처리
-                if (line.length() > 0) {
-                    try {
-                        contentStream.showText(safeText(line.toString(), koreanFont));
                     } catch (Exception e) {
                         logger.warn("[PDFService] 내용 텍스트 렌더링 실패: {}", e.getMessage());
                     }
-                    contentStream.newLine();
-                    yPosition -= LEADING;
                 }
+                
+                // 페이지 넘김이 필요하면 다음 라인으로 넘어감
+                if (needNewPage) continue;
                 
                 // 문단 사이 줄바꿈
                 contentStream.newLine();
                 yPosition -= LEADING;
                 
                 // 페이지 넘김 체크
-                if (yPosition < margin + 50 && i < paragraphs.length - 1) {
+                if (yPosition < margin + 50 && i < lines.length - 1) {
                     needNewPage = true;
                 }
             }
@@ -566,7 +512,7 @@ public class PDFService {
             
             // 마지막 페이지 번호 추가
             contentStream.beginText();
-            contentStream.setFont(koreanFont, SMALL_FONT_SIZE);
+            contentStream.setFont(NORMAL_FONT, SMALL_FONT_SIZE);
             contentStream.newLineAtOffset(width / 2 - 10, 30);
             contentStream.showText(String.valueOf(pageCount));
             contentStream.endText();  // 명시적으로 endText() 호출
@@ -595,31 +541,84 @@ public class PDFService {
     }
     
     /**
-     * 한글을 포함한 텍스트를 폰트에서 지원하는 문자만으로 변환합니다.
-     * 지원되지 않는 문자는 대체 문자로 변환됩니다.
+     * 한글을 포함한 텍스트를 기본 폰트에서도 표시 가능하도록 변환합니다.
+     * 한글 문자를 로마자(영문) 문자열로 대체합니다.
      */
-    private String safeText(String text, PDType0Font font) {
+    private String safeText(String text, PDType1Font font) {
         if (text == null || text.isEmpty()) {
             return "";
         }
         
-        StringBuilder safe = new StringBuilder();
+        // 한글 자음/모음에 대응하는 알파벳으로 변환
+        StringBuilder result = new StringBuilder();
+        
         for (char c : text.toCharArray()) {
-            try {
-                // 해당 문자가 폰트에서 지원되는지 확인
-                font.encode(String.valueOf(c));
-                safe.append(c);
-            } catch (IllegalArgumentException | IOException e) {
-                // 한글 등 지원되지 않는 문자는 로마자로 변환 또는 대체 문자 사용
-                if (Character.isLetter(c)) {
-                    char replacement = (c >= '가' && c <= '힣') ? '?' : c;
-                    safe.append(replacement);
-                } else {
-                    safe.append(c); // 기호나 숫자는 그대로 유지
-                }
+            if (c >= '가' && c <= '힣') {
+                // 한글을 로마자로 간단히 변환
+                result.append(koreanToRoman(c));
+            } else if (c > 127) {
+                // 기타 유니코드 문자는 '*'로 대체
+                result.append('*');
+            } else {
+                // ASCII 범위 문자는 그대로 사용
+                result.append(c);
             }
         }
         
-        return safe.toString();
+        return result.toString();
+    }
+    
+    /**
+     * 한글 한 글자를 로마자로 변환
+     */
+    private String koreanToRoman(char c) {
+        // 한글 초성, 중성, 종성 분리
+        int syllableIndex = c - '가';
+        
+        // 초성 인덱스 (0-18)
+        int cho = syllableIndex / (21 * 28);
+        // 중성 인덱스 (0-20)
+        int jung = (syllableIndex % (21 * 28)) / 28;
+        // 종성 인덱스 (0-27), 0은 종성 없음
+        int jong = syllableIndex % 28;
+        
+        // 초성 로마자 변환 (가나다라...)
+        String[] choToRoman = {
+            "g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", 
+            "", "j", "jj", "ch", "k", "t", "p", "h"
+        };
+        
+        // 중성 로마자 변환 (ㅏㅐㅑㅒ...)
+        String[] jungToRoman = {
+            "a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", 
+            "oe", "yo", "u", "wo", "we", "wi", "yu", "eu", "ui", "i"
+        };
+        
+        // 종성 로마자 변환 (없음, ㄱ, ㄲ, ㄳ...)
+        String[] jongToRoman = {
+            "", "k", "k", "k", "n", "n", "n", "t", "l", "l", "l", "l", "l", "l", "l", "l", 
+            "p", "p", "t", "t", "t", "t", "t", "t", "t", "k", "t", "p"
+        };
+        
+        StringBuilder roman = new StringBuilder();
+        
+        // 초성 + 중성 + 종성 결합하여 로마자 반환
+        if (cho >= 0 && cho < choToRoman.length) {
+            roman.append(choToRoman[cho]);
+        }
+        
+        if (jung >= 0 && jung < jungToRoman.length) {
+            roman.append(jungToRoman[jung]);
+        }
+        
+        if (jong > 0 && jong < jongToRoman.length) {
+            roman.append(jongToRoman[jong]);
+        }
+        
+        return roman.toString();
+    }
+
+    private boolean hasKorean(String text) {
+        return text.matches(".*[가-힣].*");
     }
 } 
