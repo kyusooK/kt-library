@@ -13,10 +13,11 @@ spec:
     metadata:
       labels:
         app: point
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: point
-          image: "username/point:latest"
+          image: "kimkyusoo/point:0520"
           ports:
             - containerPort: 8080
           readinessProbe:
