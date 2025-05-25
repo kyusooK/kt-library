@@ -2,42 +2,19 @@ package ktlibrary.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.itextpdf.text.Document;
-import com.itextpdf.text.DocumentException;
-import com.itextpdf.text.Font;
-import com.itextpdf.text.PageSize;
-import com.itextpdf.text.pdf.BaseFont;
-import com.itextpdf.text.pdf.PdfWriter;
-import com.itextpdf.tool.xml.XMLWorkerHelper;
-import com.itextpdf.tool.xml.css.CssFile;
-import com.itextpdf.tool.xml.css.StyleAttrCSSResolver;
-import com.itextpdf.tool.xml.html.CssAppliers;
-import com.itextpdf.tool.xml.html.CssAppliersImpl;
-import com.itextpdf.tool.xml.html.Tags;
-import com.itextpdf.tool.xml.parser.XMLParser;
-import com.itextpdf.tool.xml.pipeline.css.CSSResolver;
-import com.itextpdf.tool.xml.pipeline.css.CssResolverPipeline;
-import com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline;
-import com.itextpdf.tool.xml.pipeline.html.HtmlPipeline;
-import com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext;
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import javax.annotation.PostConstruct;
+import java.io.*;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Base64;
 import java.util.UUID;
-
-import javax.annotation.PostConstruct;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Service
 public class PDFService {
@@ -46,6 +23,8 @@ public class PDFService {
     
     @Value("${app.storage.path:./storage}")
     private String storagePath;
+
+    private static final String FONT_PATH = "fonts/NanumGothic.ttf";
 
     @PostConstruct
     public void init() {
@@ -71,13 +50,6 @@ public class PDFService {
             if (!Files.exists(pdfDir)) {
                 Files.createDirectories(pdfDir);
                 logger.info("PDF 디렉토리 생성: {}", pdfDir.toAbsolutePath());
-            }
-            
-            // 임시 파일 디렉토리 생성
-            Path tempDir = Paths.get(storagePath, "temp");
-            if (!Files.exists(tempDir)) {
-                Files.createDirectories(tempDir);
-                logger.info("임시 파일 디렉토리 생성: {}", tempDir.toAbsolutePath());
             }
         } catch (Exception e) {
             logger.error("스토리지 디렉토리 생성 실패: {}", e.getMessage(), e);
@@ -109,14 +81,12 @@ public class PDFService {
                 logger.info("PDF 디렉토리 생성: {}", pdfDir.toAbsolutePath());
             }
             
-            // 파일명 생성 (타임스탬프 기반 - 한글 처리 걱정 없음)
+            // 파일명 생성
             String fileName = "book_" + UUID.randomUUID().toString().substring(0, 8) + ".pdf";
-            
             Path pdfPath = pdfDir.resolve(fileName);
             
-            // HTML 생성 및 PDF 변환
-            String html = generateHtml(content, imageUrl, summary, bookName);
-            createPdfFromHtml(html, pdfPath.toString());
+            // PDF 생성
+            createPdf(content, imageUrl, summary, bookName, pdfPath.toString());
             
             return pdfPath.toAbsolutePath().toString();
         } catch (Exception e) {
@@ -132,7 +102,7 @@ public class PDFService {
                         + "이미지 URL: " + imageUrl + "\n\n"
                         + "요약:\n" + summary + "\n\n"
                         + "내용:\n" + content;
-                Files.writeString(textFilePath, errorContent, StandardCharsets.UTF_8);
+                Files.writeString(textFilePath, errorContent);
                 return textFilePath.toAbsolutePath().toString();
             } catch (IOException textError) {
                 logger.error("백업 텍스트 파일 생성 실패: {}", textError.getMessage());
@@ -142,148 +112,95 @@ public class PDFService {
     }
     
     /**
-     * 책 내용을 HTML로 변환합니다.
+     * iText를 사용하여 PDF를 생성합니다.
      */
-    private String generateHtml(String content, String imageUrl, String summary, String bookName) {
-        StringBuilder html = new StringBuilder();
-        
-        // XML 파서가 더 잘 처리할 수 있도록 간단한 HTML 구조 사용
-        html.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
-        html.append("<head>\n");
-        html.append("<title>").append(escapeHtml(bookName)).append("</title>\n");
-        html.append("<style>\n");
-        html.append("@charset \"UTF-8\";\n");
-        html.append("body { font-family: 'Arial Unicode MS', 'Arial', sans-serif; margin: 0; padding: 0; }\n");
-        html.append("h1, h2 { font-family: 'Arial Unicode MS', 'Arial', sans-serif; }\n");
-        html.append("p { font-family: 'Arial Unicode MS', 'Arial', sans-serif; line-height: 1.6; margin-bottom: 10px; }\n");
-        html.append(".cover { text-align: center; page-break-after: always; padding: 20mm; height: 257mm; }\n");
-        html.append(".summary { page-break-after: always; padding: 20mm; }\n");
-        html.append(".content { padding: 20mm; }\n");
-        html.append("</style>\n");
-        html.append("</head>\n");
-        html.append("<body>\n");
-        
-        // 표지 페이지
-        html.append("<div class=\"cover\">\n");
-        html.append("<h1>").append(escapeHtml(bookName)).append("</h1>\n");
-        
-        // 이미지 추가
-        if (imageUrl != null && !imageUrl.trim().isEmpty()) {
-            try {
-                String base64Image = getBase64Image(imageUrl);
-                if (base64Image != null) {
-                    html.append("<img src=\"data:image/jpeg;base64,").append(base64Image).append("\" />\n");
-                } else {
-                    html.append("<p>Image not available</p>\n");
-                }
-            } catch (Exception e) {
-                logger.error("이미지 처리 오류: {}", e.getMessage());
-                html.append("<p>Image loading error</p>\n");
-            }
-        } else {
-            html.append("<p>No image available</p>\n");
-        }
-        
-        html.append("</div>\n");
-        
-        // 요약 페이지
-        html.append("<div class=\"summary\">\n");
-        html.append("<h2>").append(escapeHtml(bookName)).append(" - Summary</h2>\n");
-        
-        if (summary != null && !summary.trim().isEmpty()) {
-            // 요약 내용을 문단으로 분할
-            String[] paragraphs = summary.split("\n");
-            for (String paragraph : paragraphs) {
-                if (!paragraph.trim().isEmpty()) {
-                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>\n");
-                }
-            }
-        } else {
-            html.append("<p>No summary available</p>\n");
-        }
-        
-        html.append("</div>\n");
-        
-        // 내용 페이지
-        html.append("<div class=\"content\">\n");
-        html.append("<h2>Book Content</h2>\n");
-        
-        if (content != null && !content.trim().isEmpty()) {
-            // 내용을 문단으로 분할
-            String[] paragraphs = content.split("\n");
-            for (String paragraph : paragraphs) {
-                if (!paragraph.trim().isEmpty()) {
-                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>\n");
-                }
-            }
-        } else {
-            html.append("<p>No content available</p>\n");
-        }
-        
-        html.append("</div>\n");
-        
-        html.append("</body>\n");
-        html.append("</html>");
-        
-        return html.toString();
-    }
-    
-    /**
-     * HTML을 PDF로 변환합니다.
-     * 한글 처리를 위해 향상된 방식으로 변환합니다.
-     */
-    private void createPdfFromHtml(String html, String outputPath) throws DocumentException, IOException {
-        Document document = new Document(PageSize.A4);
-        PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(outputPath));
+    private void createPdf(String content, String imageUrl, String summary, String bookName, String outputPath) throws DocumentException, IOException {
+        // 1. PDF 문서 생성
+        Document document = new Document(PageSize.A4, 50, 50, 50, 50);
+        FileOutputStream outputStream = new FileOutputStream(outputPath);
+        PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+        writer.setInitialLeading(12.5f);
+
+        // 2. 문서 열기
         document.open();
-        
+
         try {
-            // 간단한 방식으로 변경 - 기존 코드가 더 안정적
-            InputStream is = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
-            XMLWorkerHelper.getInstance().parseXHtml(writer, document, is, StandardCharsets.UTF_8);
+            // 3. 폰트 설정
+            BaseFont baseFont = BaseFont.createFont(
+                new org.springframework.core.io.ClassPathResource(FONT_PATH).getURL().toString(),
+                BaseFont.IDENTITY_H, 
+                BaseFont.EMBEDDED
+            );
+            Font titleFont = new Font(baseFont, 20, Font.BOLD);
+            Font normalFont = new Font(baseFont, 12, Font.NORMAL);
+            Font subtitleFont = new Font(baseFont, 16, Font.BOLD);
+            
+            // 4. 제목 추가
+            Paragraph title = new Paragraph(bookName, titleFont);
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingAfter(20);
+            document.add(title);
+
+            // 5. 표지 이미지 추가 (있는 경우)
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                try {
+                    Image coverImage = Image.getInstance(new URL(imageUrl));
+                    coverImage.setAlignment(Element.ALIGN_CENTER);
+                    // 적절한 크기로 조정
+                    float width = document.getPageSize().getWidth() - 100;
+                    float height = 300;
+                    coverImage.scaleToFit(width, height);
+                    document.add(coverImage);
+                    document.add(new Paragraph("\n")); // 이미지와 텍스트 사이 간격
+                } catch (Exception e) {
+                    logger.error("이미지 추가 실패: {}", e.getMessage());
+                    document.add(new Paragraph("이미지를 불러올 수 없습니다.", normalFont));
+                }
+            }
+
+            // 6. 요약 섹션 추가
+            document.add(new Paragraph("요약", subtitleFont));
+            document.add(new Paragraph("\n"));
+            
+            if (summary != null && !summary.isEmpty()) {
+                Paragraph summaryParagraph = new Paragraph();
+                summaryParagraph.setFont(normalFont);
+                summaryParagraph.add(summary);
+                document.add(summaryParagraph);
+            } else {
+                document.add(new Paragraph("요약 내용이 없습니다.", normalFont));
+            }
+            
+            document.add(new Paragraph("\n\n"));
+            
+            // 7. 새 페이지 추가
+            document.newPage();
+            
+            // 8. 본문 내용 추가
+            document.add(new Paragraph("본문", subtitleFont));
+            document.add(new Paragraph("\n"));
+            
+            if (content != null && !content.isEmpty()) {
+                Paragraph contentParagraph = new Paragraph();
+                contentParagraph.setFont(normalFont);
+                // 줄바꿈을 유지하며 텍스트 추가
+                String[] lines = content.split("\n");
+                for (int i = 0; i < lines.length; i++) {
+                    contentParagraph.add(lines[i]);
+                    if (i < lines.length - 1) {
+                        contentParagraph.add("\n");
+                    }
+                }
+                document.add(contentParagraph);
+            } else {
+                document.add(new Paragraph("본문 내용이 없습니다.", normalFont));
+            }
         } finally {
+            // 9. 문서 닫기
             document.close();
+            writer.close();
+            outputStream.close();
             logger.info("PDF 파일 생성 완료: {}", outputPath);
         }
-    }
-    
-    /**
-     * 이미지 URL에서 Base64 인코딩 문자열을 가져옵니다.
-     */
-    private String getBase64Image(String imageUrl) {
-        try {
-            URL url = new URL(imageUrl);
-            byte[] imageBytes = downloadImage(url);
-            return Base64.getEncoder().encodeToString(imageBytes);
-        } catch (Exception e) {
-            logger.error("이미지 다운로드 실패: {}", e.getMessage());
-            return null;
-        }
-    }
-    
-    /**
-     * URL에서 이미지를 다운로드합니다.
-     */
-    private byte[] downloadImage(URL url) throws IOException {
-        try (InputStream in = url.openStream()) {
-            return in.readAllBytes();
-        }
-    }
-    
-    /**
-     * HTML 특수 문자를 이스케이프합니다.
-     */
-    private String escapeHtml(String text) {
-        if (text == null) {
-            return "";
-        }
-        
-        return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
     }
 } 
