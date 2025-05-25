@@ -24,7 +24,7 @@ public class PDFService {
     @Value("${app.storage.path:./storage}")
     private String storagePath;
 
-    private static final String FONT_PATH = "fonts/NanumGothic.ttf";
+    private static final String FONT_PATH = "fonts/NanumSquareR.ttf";
 
     @PostConstruct
     public void init() {
