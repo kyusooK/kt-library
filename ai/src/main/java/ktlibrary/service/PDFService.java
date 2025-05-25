@@ -123,25 +123,63 @@ public class PDFService {
 
         // 2. 문서 열기
         document.open();
+        
+        // 3. 최소한 하나의 더미 페이지 추가 (빈 페이지 방지)
+        boolean contentAdded = false;
 
         try {
-            // 3. 폰트 설정
-            BaseFont baseFont = BaseFont.createFont(
-                new org.springframework.core.io.ClassPathResource(FONT_PATH).getURL().toString(),
-                BaseFont.IDENTITY_H, 
-                BaseFont.EMBEDDED
-            );
-            Font titleFont = new Font(baseFont, 20, Font.BOLD);
-            Font normalFont = new Font(baseFont, 12, Font.NORMAL);
-            Font subtitleFont = new Font(baseFont, 16, Font.BOLD);
+            // 4. 폰트 설정 (기본 폰트로 시작하고 커스텀 폰트 로드 시도)
+            Font titleFont, normalFont, subtitleFont;
             
-            // 4. 제목 추가
+            try {
+                // 커스텀 폰트 로드 시도
+                BaseFont baseFont = null;
+                
+                try {
+                    // 방법 1: ClassPathResource 사용
+                    baseFont = BaseFont.createFont(
+                        new org.springframework.core.io.ClassPathResource(FONT_PATH).getURL().toString(),
+                        BaseFont.IDENTITY_H, 
+                        BaseFont.EMBEDDED
+                    );
+                    logger.info("ClassPathResource를 통해 폰트 로드 성공");
+                } catch (Exception e1) {
+                    logger.warn("ClassPathResource 폰트 로드 실패, 다른 방법 시도: {}", e1.getMessage());
+                    
+                    try {
+                        // 방법 2: 직접 경로 지정
+                        baseFont = BaseFont.createFont(
+                            "src/main/resources/" + FONT_PATH,
+                            BaseFont.IDENTITY_H, 
+                            BaseFont.EMBEDDED
+                        );
+                        logger.info("직접 경로 지정으로 폰트 로드 성공");
+                    } catch (Exception e2) {
+                        logger.warn("직접 경로 폰트 로드 실패: {}", e2.getMessage());
+                        // 방법 3: 기본 폰트 사용
+                        throw new Exception("커스텀 폰트 로드 실패");
+                    }
+                }
+                
+                titleFont = new Font(baseFont, 20, Font.BOLD);
+                normalFont = new Font(baseFont, 12, Font.NORMAL);
+                subtitleFont = new Font(baseFont, 16, Font.BOLD);
+            } catch (Exception e) {
+                // 기본 폰트 사용 (폰트 로드 실패 시)
+                logger.warn("커스텀 폰트 로드 실패, 기본 폰트 사용: {}", e.getMessage());
+                titleFont = new Font(Font.FontFamily.HELVETICA, 20, Font.BOLD);
+                normalFont = new Font(Font.FontFamily.HELVETICA, 12, Font.NORMAL);
+                subtitleFont = new Font(Font.FontFamily.HELVETICA, 16, Font.BOLD);
+            }
+            
+            // 5. 제목 추가
             Paragraph title = new Paragraph(bookName, titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             title.setSpacingAfter(20);
             document.add(title);
+            contentAdded = true;
 
-            // 5. 표지 이미지 추가 (있는 경우)
+            // 6. 표지 이미지 추가 (있는 경우)
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 try {
                     Image coverImage = Image.getInstance(new URL(imageUrl));
@@ -158,7 +196,7 @@ public class PDFService {
                 }
             }
 
-            // 6. 요약 섹션 추가
+            // 7. 요약 섹션 추가
             document.add(new Paragraph("요약", subtitleFont));
             document.add(new Paragraph("\n"));
             
@@ -173,10 +211,10 @@ public class PDFService {
             
             document.add(new Paragraph("\n\n"));
             
-            // 7. 새 페이지 추가
+            // 8. 새 페이지 추가
             document.newPage();
             
-            // 8. 본문 내용 추가
+            // 9. 본문 내용 추가
             document.add(new Paragraph("본문", subtitleFont));
             document.add(new Paragraph("\n"));
             
@@ -188,19 +226,33 @@ public class PDFService {
                 for (int i = 0; i < lines.length; i++) {
                     contentParagraph.add(lines[i]);
                     if (i < lines.length - 1) {
-                        contentParagraph.add("\n");
+                        contentParagraph.add(Chunk.NEWLINE);
                     }
                 }
                 document.add(contentParagraph);
             } else {
                 document.add(new Paragraph("본문 내용이 없습니다.", normalFont));
             }
+        } catch (Exception e) {
+            logger.error("PDF 내용 추가 중 오류 발생: {}", e.getMessage(), e);
+            
+            // 오류 발생 시에도 최소한 한 페이지 생성 (빈 페이지 방지)
+            if (!contentAdded) {
+                document.add(new Paragraph("PDF 생성 중 오류가 발생했습니다."));
+                document.add(new Paragraph("오류 메시지: " + e.getMessage()));
+            }
         } finally {
-            // 9. 문서 닫기
-            document.close();
-            writer.close();
-            outputStream.close();
-            logger.info("PDF 파일 생성 완료: {}", outputPath);
+            try {
+                // 10. 문서 닫기
+                if (document.isOpen()) {
+                    document.close();
+                }
+                writer.close();
+                outputStream.close();
+                logger.info("PDF 파일 생성 완료: {}", outputPath);
+            } catch (Exception e) {
+                logger.error("PDF 문서 닫기 중 오류 발생: {}", e.getMessage(), e);
+            }
         }
     }
 } 
