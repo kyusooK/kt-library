@@ -153,8 +153,15 @@ public class Publishing {
                 logger.info("7단계 완료: 웹 URL 생성됨 - {}", webUrl);
             } catch (Exception e) {
                 logger.error("웹 URL 생성 실패: {}", e.getMessage(), e);
-                // 오류 발생 시 기본 URL 설정
-                publishing.setWebUrl("http://localhost:8080/pdfs/" + fileName);
+                // 오류 발생 시에도 동적으로 URL 생성 시도
+                try {
+                    String fallbackUrl = "http://localhost:8084/pdfs/" + fileName;
+                    publishing.setWebUrl(fallbackUrl);
+                    logger.warn("폴백 URL 사용: {}", fallbackUrl);
+                } catch (Exception fallbackError) {
+                    logger.error("폴백 URL 생성도 실패: {}", fallbackError.getMessage());
+                    publishing.setWebUrl("/pdfs/" + fileName); // 상대 경로로 설정
+                }
             }
     
             // 8. 출판 정보 저장

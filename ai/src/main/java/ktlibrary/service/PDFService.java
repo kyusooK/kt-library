@@ -186,10 +186,13 @@ public class PDFService {
             logger.info("동적 웹 URL 생성: {}", webUrl);
             return webUrl;
             
+        } catch (IllegalStateException e) {
+            // HTTP 요청 컨텍스트가 없는 경우 (백그라운드 작업 등)
+            logger.warn("HTTP 요청 컨텍스트가 없음, 환경변수 기반 URL 생성 시도: {}", e.getMessage());
+            return generateUrlFromEnvironment(fileName);
         } catch (Exception e) {
-            logger.warn("동적 URL 생성 실패, 기본값 사용: {}", e.getMessage());
-            // 요청 컨텍스트를 가져올 수 없는 경우 기본값 사용
-            return "http://localhost:" + this.serverPort + "/pdfs/" + fileName;
+            logger.warn("동적 URL 생성 실패, 환경변수 기반 URL 생성 시도: {}", e.getMessage());
+            return generateUrlFromEnvironment(fileName);
         }
     }
     
@@ -274,6 +277,31 @@ public class PDFService {
         }
         
         return null;
+    }
+
+    /**
+     * HTTP 요청 컨텍스트 없이 환경변수만으로 URL을 생성합니다.
+     */
+    private String generateUrlFromEnvironment(String fileName) {
+        try {
+            // 환경변수에서 Cloud IDE URL 감지
+            String cloudUrl = detectFromEnvironmentVariables();
+            if (cloudUrl != null) {
+                String webUrl = cloudUrl + "/pdfs/" + fileName;
+                logger.info("환경변수 기반 웹 URL 생성: {}", webUrl);
+                return webUrl;
+            }
+            
+            // Cloud IDE 환경변수가 없는 경우 기본값 사용
+            String fallbackUrl = "http://localhost:" + this.serverPort + "/pdfs/" + fileName;
+            logger.warn("기본 폴백 URL 사용: {}", fallbackUrl);
+            return fallbackUrl;
+            
+        } catch (Exception e) {
+            logger.error("환경변수 기반 URL 생성 실패: {}", e.getMessage());
+            // 최후의 수단으로 상대 경로 반환
+            return "/pdfs/" + fileName;
+        }
     }
 
     /**
