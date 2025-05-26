@@ -150,17 +150,53 @@ public class Publishing {
                 // 파일명만 추출
                 String fileName = pdfPath.substring(pdfPath.lastIndexOf("/") + 1);
                 
-                // 상대 경로 생성 (앞에 / 포함)
+                // 상대 경로 생성
                 String relativePath = "/storage/pdfs/" + fileName;
                 
-                // 환경에 관계없이 상대 경로만 저장
-                // 웹 애플리케이션 내에서는 서버의 루트에서부터의 경로로 접근 가능
-                publishing.setWebUrl(relativePath);
-                logger.info("PDF 상대 경로 저장: {}", relativePath);
+                // 베이스 URL 결정 - 환경 변수, 시스템 속성 또는 기본값 사용
+                String baseUrl;
+                
+                // 1. 환경 변수에서 설정된 베이스 URL 확인
+                String envBaseUrl = System.getenv("APP_BASE_URL");
+                if (envBaseUrl != null && !envBaseUrl.isEmpty()) {
+                    baseUrl = envBaseUrl;
+                    logger.info("환경 변수에서 베이스 URL 사용: {}", baseUrl);
+                } 
+                // 2. 시스템 속성에서 베이스 URL 확인
+                else if (System.getProperty("app.base.url") != null) {
+                    baseUrl = System.getProperty("app.base.url");
+                    logger.info("시스템 속성에서 베이스 URL 사용: {}", baseUrl);
+                }
+                // 3. Gitpod 환경 변수 확인
+                else if (System.getenv("GITPOD_WORKSPACE_ID") != null) {
+                    // Gitpod 환경으로 판단하고 워크스페이스 ID 가져오기
+                    String workspaceId = System.getenv("GITPOD_WORKSPACE_ID");
+                    String workspaceCluster = System.getenv("GITPOD_WORKSPACE_CLUSTER_HOST");
+                    
+                    if (workspaceId != null && workspaceCluster != null) {
+                        // Gitpod URL 형식: https://8080-{workspace-id}.{cluster}
+                        baseUrl = "https://8080-" + workspaceId + "." + workspaceCluster;
+                        logger.info("Gitpod 환경 변수로 베이스 URL 생성: {}", baseUrl);
+                    } else {
+                        // 기본 Gitpod URL (이전에 확인된 URL)
+                        baseUrl = "https://8080-kyusook-ktlibrary-4yq18kjblzo.ws-us119.gitpod.io";
+                        logger.info("기본 Gitpod URL 사용: {}", baseUrl);
+                    }
+                }
+                // 4. 기본 로컬 URL 사용
+                else {
+                    baseUrl = "http://localhost:8080";
+                    logger.info("기본 로컬 URL 사용: {}", baseUrl);
+                }
+                
+                // 전체 URL 구성 및 저장
+                String fullUrl = baseUrl + relativePath;
+                publishing.setWebUrl(fullUrl);
+                logger.info("PDF 전체 URL 저장: {}", fullUrl);
             } catch (Exception e) {
-                logger.error("PDF URL 생성 실패: {}", e.getMessage());
-                // 오류 발생 시 기본 경로 설정
-                publishing.setWebUrl("/storage/pdfs/error.pdf");
+                logger.error("PDF URL 생성 실패: {}", e.getMessage(), e);
+                // 오류 발생 시 기본 Gitpod URL 사용
+                publishing.setWebUrl("https://8080-kyusook-ktlibrary-4yq18kjblzo.ws-us119.gitpod.io/storage/pdfs/error.pdf");
             }
     
             // 7. 출판 정보 저장
