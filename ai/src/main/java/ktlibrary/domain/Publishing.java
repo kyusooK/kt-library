@@ -146,16 +146,21 @@ public class Publishing {
             logger.info("6단계 완료: PDF 생성됨 - {}", pdfPath);
             
             // PDF 파일 경로를 웹에서 접근 가능한 URL로 변환
-            // 기존 webUrl을 PDF 파일 URL로 업데이트
             try {
-                // 절대 경로를 상대 경로로 변환
-                String relativePath = pdfPath.substring(pdfPath.indexOf("/storage"));
-                // 웹 서버의 기본 URL에 PDF 경로 추가
-                String pdfUrl = "http://localhost:8080" + relativePath;
-                publishing.setWebUrl(pdfUrl);
-                logger.info("PDF 웹 URL 업데이트: {}", pdfUrl);
+                // 파일명만 추출
+                String fileName = pdfPath.substring(pdfPath.lastIndexOf("/") + 1);
+                
+                // 상대 경로 생성 (앞에 / 포함)
+                String relativePath = "/storage/pdfs/" + fileName;
+                
+                // 환경에 관계없이 상대 경로만 저장
+                // 웹 애플리케이션 내에서는 서버의 루트에서부터의 경로로 접근 가능
+                publishing.setWebUrl(relativePath);
+                logger.info("PDF 상대 경로 저장: {}", relativePath);
             } catch (Exception e) {
                 logger.error("PDF URL 생성 실패: {}", e.getMessage());
+                // 오류 발생 시 기본 경로 설정
+                publishing.setWebUrl("/storage/pdfs/error.pdf");
             }
     
             // 7. 출판 정보 저장
