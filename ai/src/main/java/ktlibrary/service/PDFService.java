@@ -57,6 +57,40 @@ public class PDFService {
     }
 
     /**
+     * 책 제목을 안전한 파일 이름으로 변환합니다.
+     * 파일 시스템에서 사용할 수 없는 특수 문자를 제거하고 공백을 언더스코어로 변환합니다.
+     * 
+     * @param bookName 책 제목
+     * @return 안전한 파일 이름
+     */
+    private String createSafeFileName(String bookName) {
+        if (bookName == null || bookName.trim().isEmpty()) {
+            return "book_" + UUID.randomUUID().toString().substring(0, 8);
+        }
+        
+        // 1. 파일명으로 사용할 수 없는 특수문자 제거
+        String safeFileName = bookName
+                .replaceAll("[\\\\/:*?\"<>|]", "") // 윈도우에서 파일명에 사용할 수 없는 문자 제거
+                .replaceAll("[^a-zA-Z0-9가-힣\\s._-]", "") // 알파벳, 숫자, 한글, 공백, 점, 언더스코어, 하이픈만 허용
+                .trim(); // 앞뒤 공백 제거
+        
+        // 2. 공백을 언더스코어로 변환
+        safeFileName = safeFileName.replaceAll("\\s+", "_");
+        
+        // 3. 길이 제한 (최대 50자)
+        if (safeFileName.length() > 50) {
+            safeFileName = safeFileName.substring(0, 50);
+        }
+        
+        // 4. 빈 문자열이거나 특수문자 제거 후 길이가 0인 경우 기본값 사용
+        if (safeFileName.isEmpty()) {
+            return "book_" + UUID.randomUUID().toString().substring(0, 8);
+        }
+        
+        return safeFileName;
+    }
+
+    /**
      * 책 내용, 이미지, 요약을 기반으로 PDF를 생성하고 경로를 반환합니다.
      * @param content 책 내용
      * @param imageUrl 표지 이미지 URL
@@ -81,9 +115,18 @@ public class PDFService {
                 logger.info("PDF 디렉토리 생성: {}", pdfDir.toAbsolutePath());
             }
             
-            // 파일명 생성
-            String fileName = "book_" + UUID.randomUUID().toString().substring(0, 8) + ".pdf";
+            // 책 제목을 기반으로 파일명 생성
+            String safeFileName = createSafeFileName(bookName);
+            String fileName = safeFileName + ".pdf";
             Path pdfPath = pdfDir.resolve(fileName);
+            
+            // 파일명 중복 확인 및 처리
+            int counter = 1;
+            while (Files.exists(pdfPath)) {
+                fileName = safeFileName + "_" + counter + ".pdf";
+                pdfPath = pdfDir.resolve(fileName);
+                counter++;
+            }
             
             // PDF 생성
             createPdf(content, imageUrl, summary, bookName, pdfPath.toString());
