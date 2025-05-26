@@ -2,6 +2,8 @@ package ktlibrary.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,6 +11,7 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
 
 import javax.annotation.PostConstruct;
+import javax.servlet.http.HttpServletRequest;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
@@ -26,9 +29,6 @@ public class PDFService {
     
     @Value("${server.port:8080}")
     private String serverPort;
-    
-    @Value("${app.base-url:http://localhost}")
-    private String baseUrl;
 
     private static final String FONT_PATH = "fonts/NanumSquareR.ttf";
 
@@ -164,11 +164,39 @@ public class PDFService {
     
     /**
      * 파일명을 기반으로 웹에서 접근 가능한 URL을 생성합니다.
+     * 현재 요청의 호스트 정보를 동적으로 가져와서 URL을 생성합니다.
      * @param fileName 파일명 (확장자 제외)
      * @return 웹 URL
      */
     public String generateWebUrl(String fileName) {
-        return baseUrl + ":" + serverPort + "/pdfs/" + fileName;
+        try {
+            // 현재 HTTP 요청에서 호스트 정보를 동적으로 가져오기
+            ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpServletRequest request = attr.getRequest();
+            
+            String scheme = request.getScheme(); // http 또는 https
+            String serverName = request.getServerName(); // 호스트명 (예: localhost, codespace-url 등)
+            int serverPort = request.getServerPort(); // 포트 번호
+            
+            // URL 생성
+            String baseUrl;
+            if ((scheme.equals("http") && serverPort == 80) || (scheme.equals("https") && serverPort == 443)) {
+                // 기본 포트인 경우 포트 번호 생략
+                baseUrl = scheme + "://" + serverName;
+            } else {
+                // 기본 포트가 아닌 경우 포트 번호 포함
+                baseUrl = scheme + "://" + serverName + ":" + serverPort;
+            }
+            
+            String webUrl = baseUrl + "/pdfs/" + fileName;
+            logger.info("동적 웹 URL 생성: {}", webUrl);
+            return webUrl;
+            
+        } catch (Exception e) {
+            logger.warn("동적 URL 생성 실패, 기본값 사용: {}", e.getMessage());
+            // 요청 컨텍스트를 가져올 수 없는 경우 기본값 사용
+            return "http://localhost:" + this.serverPort + "/pdfs/" + fileName;
+        }
     }
 
     /**
