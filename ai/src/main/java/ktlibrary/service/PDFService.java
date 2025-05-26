@@ -23,6 +23,12 @@ public class PDFService {
     
     @Value("${app.storage.path:./storage}")
     private String storagePath;
+    
+    @Value("${server.port:8080}")
+    private String serverPort;
+    
+    @Value("${app.base-url:http://localhost}")
+    private String baseUrl;
 
     private static final String FONT_PATH = "fonts/NanumSquareR.ttf";
 
@@ -91,12 +97,12 @@ public class PDFService {
     }
 
     /**
-     * 책 내용, 이미지, 요약을 기반으로 PDF를 생성하고 경로를 반환합니다.
+     * 책 내용, 이미지, 요약을 기반으로 PDF를 생성하고 파일명을 반환합니다.
      * @param content 책 내용
      * @param imageUrl 표지 이미지 URL
      * @param summary 요약 내용
      * @param bookName 책 제목
-     * @return 생성된 PDF 경로
+     * @return 생성된 PDF 파일명 (확장자 제외)
      */
     public String generatePdf(String content, String imageUrl, String summary, String bookName) {
         logger.info("PDF 생성 시작: {}", bookName);
@@ -123,7 +129,8 @@ public class PDFService {
             // 파일명 중복 확인 및 처리
             int counter = 1;
             while (Files.exists(pdfPath)) {
-                fileName = safeFileName + "_" + counter + ".pdf";
+                safeFileName = createSafeFileName(bookName) + "_" + counter;
+                fileName = safeFileName + ".pdf";
                 pdfPath = pdfDir.resolve(fileName);
                 counter++;
             }
@@ -131,29 +138,39 @@ public class PDFService {
             // PDF 생성
             createPdf(content, imageUrl, summary, bookName, pdfPath.toString());
             
-            return pdfPath.toAbsolutePath().toString();
+            // 확장자를 제외한 파일명 반환 (웹 URL 생성용)
+            return safeFileName;
         } catch (Exception e) {
             logger.error("PDF 생성 중 오류 발생: {}", e.getMessage(), e);
             
             // 오류 발생 시 백업으로 텍스트 파일 생성
             try {
-                String errorFileName = "error_" + UUID.randomUUID().toString().substring(0, 8) + ".txt";
+                String errorFileName = "error_" + UUID.randomUUID().toString().substring(0, 8);
                 
-                Path textFilePath = Paths.get(storagePath, "pdfs", errorFileName);
+                Path textFilePath = Paths.get(storagePath, "pdfs", errorFileName + ".txt");
                 String errorContent = "PDF 생성 중 오류 발생\n\n"
                         + "제목: " + bookName + "\n\n"
                         + "이미지 URL: " + imageUrl + "\n\n"
                         + "요약:\n" + summary + "\n\n"
                         + "내용:\n" + content;
                 Files.writeString(textFilePath, errorContent);
-                return textFilePath.toAbsolutePath().toString();
+                return errorFileName;
             } catch (IOException textError) {
                 logger.error("백업 텍스트 파일 생성 실패: {}", textError.getMessage());
-                return "/storage/pdfs/error.txt";
+                return "error";
             }
         }
     }
     
+    /**
+     * 파일명을 기반으로 웹에서 접근 가능한 URL을 생성합니다.
+     * @param fileName 파일명 (확장자 제외)
+     * @return 웹 URL
+     */
+    public String generateWebUrl(String fileName) {
+        return baseUrl + ":" + serverPort + "/pdfs/" + fileName;
+    }
+
     /**
      * iText를 사용하여 PDF를 생성합니다.
      */

@@ -137,78 +137,36 @@ public class Publishing {
             
             // 6. 모든 정보가 준비된 후 PDF 생성 (PDFService 직접 호출)
             logger.info("6단계: PDF 생성 시작");
-            String pdfPath = pdfService.generatePdf(
+            String fileName = pdfService.generatePdf(
                 content, 
                 publishing.getImage(), 
                 publishing.getSummaryContent(), 
                 publishing.getBookName());
-            publishing.setPdfPath(pdfPath);
-            logger.info("6단계 완료: PDF 생성됨 - {}", pdfPath);
+            publishing.setPdfPath(fileName);
+            logger.info("6단계 완료: PDF 생성됨 - {}", fileName);
             
-            // PDF 파일 경로를 웹에서 접근 가능한 URL로 변환
+            // 7. PDF 파일명을 웹에서 접근 가능한 URL로 변환
+            logger.info("7단계: 웹 URL 생성 시작");
             try {
-                // 파일명만 추출
-                String fileName = pdfPath.substring(pdfPath.lastIndexOf("/") + 1);
-                
-                // 상대 경로 생성
-                String relativePath = "/storage/pdfs/" + fileName;
-                
-                // 베이스 URL 결정 - 환경 변수, 시스템 속성 또는 기본값 사용
-                String baseUrl;
-                
-                // 1. 환경 변수에서 설정된 베이스 URL 확인
-                String envBaseUrl = System.getenv("APP_BASE_URL");
-                if (envBaseUrl != null && !envBaseUrl.isEmpty()) {
-                    baseUrl = envBaseUrl;
-                    logger.info("환경 변수에서 베이스 URL 사용: {}", baseUrl);
-                } 
-                // 2. 시스템 속성에서 베이스 URL 확인
-                else if (System.getProperty("app.base.url") != null) {
-                    baseUrl = System.getProperty("app.base.url");
-                    logger.info("시스템 속성에서 베이스 URL 사용: {}", baseUrl);
-                }
-                // 3. Gitpod 환경 변수 확인
-                else if (System.getenv("GITPOD_WORKSPACE_ID") != null) {
-                    // Gitpod 환경으로 판단하고 워크스페이스 ID 가져오기
-                    String workspaceId = System.getenv("GITPOD_WORKSPACE_ID");
-                    String workspaceCluster = System.getenv("GITPOD_WORKSPACE_CLUSTER_HOST");
-                    
-                    if (workspaceId != null && workspaceCluster != null) {
-                        // Gitpod URL 형식: https://8080-{workspace-id}.{cluster}
-                        baseUrl = "https://8080-" + workspaceId + "." + workspaceCluster;
-                        logger.info("Gitpod 환경 변수로 베이스 URL 생성: {}", baseUrl);
-                    } else {
-                        // 기본 Gitpod URL (이전에 확인된 URL)
-                        baseUrl = "https://8080-kyusook-ktlibrary-4yq18kjblzo.ws-us119.gitpod.io";
-                        logger.info("기본 Gitpod URL 사용: {}", baseUrl);
-                    }
-                }
-                // 4. 기본 로컬 URL 사용
-                else {
-                    baseUrl = "http://localhost:8080";
-                    logger.info("기본 로컬 URL 사용: {}", baseUrl);
-                }
-                
-                // 전체 URL 구성 및 저장
-                String fullUrl = baseUrl + relativePath;
-                publishing.setWebUrl(fullUrl);
-                logger.info("PDF 전체 URL 저장: {}", fullUrl);
+                String webUrl = pdfService.generateWebUrl(fileName);
+                publishing.setWebUrl(webUrl);
+                logger.info("7단계 완료: 웹 URL 생성됨 - {}", webUrl);
             } catch (Exception e) {
-                logger.error("PDF URL 생성 실패: {}", e.getMessage(), e);
-                // 오류 발생 시 기본 Gitpod URL 사용
-                publishing.setWebUrl("https://8080-kyusook-ktlibrary-4yq18kjblzo.ws-us119.gitpod.io/storage/pdfs/error.pdf");
+                logger.error("웹 URL 생성 실패: {}", e.getMessage(), e);
+                // 오류 발생 시 기본 URL 설정
+                publishing.setWebUrl("http://localhost:8080/pdfs/" + fileName);
             }
     
-            // 7. 출판 정보 저장
-            logger.info("7단계: 출판 정보 저장 시작");
+            // 8. 출판 정보 저장
+            logger.info("8단계: 출판 정보 저장 시작");
             repository().save(publishing);
-            logger.info("7단계 완료: 출판 정보 저장됨");
+            logger.info("8단계 완료: 출판 정보 저장됨");
     
-            // 8. 이벤트 발행
-            logger.info("8단계: 출판 이벤트 발행 시작");
+            // 9. 이벤트 발행
+            logger.info("9단계: 출판 이벤트 발행 시작");
             Published published = new Published(publishing);
             published.publishAfterCommit();
-            logger.info("8단계 완료: 출판 이벤트 발행됨");
+            logger.info("9단계 완료: 출판 이벤트 발행됨");
             
             logger.info("===== AI 출판 처리 완료 =====\n");
         } catch (Exception e) {

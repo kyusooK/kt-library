@@ -45,20 +45,31 @@ public class PublishingController {
     }
 
     /**
-     * 생성된 PDF(텍스트) 파일을 다운로드할 수 있도록 제공합니다.
+     * 생성된 PDF 파일을 브라우저에서 바로 열거나 다운로드할 수 있도록 제공합니다.
      */
-    @GetMapping(value = "/pdfs/{id}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    @GetMapping(value = "/pdfs/{id}")
     public ResponseEntity<Resource> getPdfFile(@PathVariable String id) {
         try {
-            Path pdfPath = Paths.get(storagePath, "pdfs", id + ".txt");
+            // 먼저 PDF 파일을 찾아보고, 없으면 텍스트 파일을 찾습니다.
+            Path pdfPath = Paths.get(storagePath, "pdfs", id + ".pdf");
+            String contentType = MediaType.APPLICATION_PDF_VALUE;
+            String fileName = id + ".pdf";
             
             if (!Files.exists(pdfPath)) {
-                return ResponseEntity.notFound().build();
+                // PDF 파일이 없으면 텍스트 파일을 찾습니다.
+                pdfPath = Paths.get(storagePath, "pdfs", id + ".txt");
+                contentType = MediaType.TEXT_PLAIN_VALUE;
+                fileName = id + ".txt";
+                
+                if (!Files.exists(pdfPath)) {
+                    return ResponseEntity.notFound().build();
+                }
             }
             
             Resource resource = new FileSystemResource(pdfPath.toFile());
             return ResponseEntity.ok()
-                    .header("Content-Disposition", "attachment; filename=\"" + id + ".txt\"")
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header("Content-Disposition", "inline; filename=\"" + fileName + "\"")
                     .body(resource);
         } catch (Exception e) {
             e.printStackTrace();
