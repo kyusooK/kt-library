@@ -175,20 +175,14 @@ public class PDFService {
             HttpServletRequest request = attr.getRequest();
             
             String scheme = request.getScheme(); // http 또는 https
-            String serverName = request.getServerName(); // 호스트명 (예: localhost, codespace-url 등)
+            String serverName = request.getServerName(); // 호스트명
             int serverPort = request.getServerPort(); // 포트 번호
+            String contextPath = request.getContextPath(); // 컨텍스트 패스
             
-            // URL 생성
-            String baseUrl;
-            if ((scheme.equals("http") && serverPort == 80) || (scheme.equals("https") && serverPort == 443)) {
-                // 기본 포트인 경우 포트 번호 생략
-                baseUrl = scheme + "://" + serverName;
-            } else {
-                // 기본 포트가 아닌 경우 포트 번호 포함
-                baseUrl = scheme + "://" + serverName + ":" + serverPort;
-            }
+            // Cloud IDE 환경 감지 및 처리
+            String baseUrl = detectCloudEnvironment(scheme, serverName, serverPort, request);
             
-            String webUrl = baseUrl + "/pdfs/" + fileName;
+            String webUrl = baseUrl + contextPath + "/pdfs/" + fileName;
             logger.info("동적 웹 URL 생성: {}", webUrl);
             return webUrl;
             
@@ -197,6 +191,89 @@ public class PDFService {
             // 요청 컨텍스트를 가져올 수 없는 경우 기본값 사용
             return "http://localhost:" + this.serverPort + "/pdfs/" + fileName;
         }
+    }
+    
+    /**
+     * Cloud IDE 환경을 감지하고 적절한 베이스 URL을 반환합니다.
+     */
+    private String detectCloudEnvironment(String scheme, String serverName, int serverPort, HttpServletRequest request) {
+        // 1. GitHub Codespaces 감지
+        if (serverName.contains("github.dev") || serverName.contains("githubpreview.dev")) {
+            return scheme + "://" + serverName;
+        }
+        
+        // 2. GitPod 감지
+        if (serverName.contains("gitpod.io")) {
+            return scheme + "://" + serverName;
+        }
+        
+        // 3. Cloud9 감지
+        if (serverName.contains("cloud9.amazon.com") || serverName.contains("c9users.io")) {
+            return scheme + "://" + serverName;
+        }
+        
+        // 4. Replit 감지
+        if (serverName.contains("replit.dev") || serverName.contains("repl.co")) {
+            return scheme + "://" + serverName;
+        }
+        
+        // 5. CodeSandbox 감지
+        if (serverName.contains("codesandbox.io")) {
+            return scheme + "://" + serverName;
+        }
+        
+        // 6. 기타 Cloud IDE 환경 감지 (환경변수 확인)
+        String cloudUrl = detectFromEnvironmentVariables();
+        if (cloudUrl != null) {
+            return cloudUrl;
+        }
+        
+        // 7. X-Forwarded-Host 헤더 확인 (프록시 환경)
+        String forwardedHost = request.getHeader("X-Forwarded-Host");
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        if (forwardedHost != null) {
+            String protocol = forwardedProto != null ? forwardedProto : scheme;
+            return protocol + "://" + forwardedHost;
+        }
+        
+        // 8. Host 헤더 확인
+        String hostHeader = request.getHeader("Host");
+        if (hostHeader != null && !hostHeader.equals(serverName + ":" + serverPort)) {
+            return scheme + "://" + hostHeader;
+        }
+        
+        // 9. 기본 URL 생성
+        if ((scheme.equals("http") && serverPort == 80) || (scheme.equals("https") && serverPort == 443)) {
+            return scheme + "://" + serverName;
+        } else {
+            return scheme + "://" + serverName + ":" + serverPort;
+        }
+    }
+    
+    /**
+     * 환경변수에서 Cloud IDE URL을 감지합니다.
+     */
+    private String detectFromEnvironmentVariables() {
+        // GitHub Codespaces
+        String codespaceName = System.getenv("CODESPACE_NAME");
+        if (codespaceName != null) {
+            return "https://" + codespaceName + "-8084.app.github.dev";
+        }
+        
+        // GitPod
+        String gitpodWorkspaceUrl = System.getenv("GITPOD_WORKSPACE_URL");
+        if (gitpodWorkspaceUrl != null) {
+            return gitpodWorkspaceUrl.replace("https://", "https://8084-");
+        }
+        
+        // Replit
+        String replitSlug = System.getenv("REPL_SLUG");
+        String replitOwner = System.getenv("REPL_OWNER");
+        if (replitSlug != null && replitOwner != null) {
+            return "https://" + replitSlug + "." + replitOwner + ".repl.co";
+        }
+        
+        return null;
     }
 
     /**
